@@ -33,6 +33,7 @@ copy .env.example .env        # macOS/Linux: cp .env.example .env
 
 ## Working together
 
-- Branch per piece of work (`feature/<what>`), pull request into `main`, one review.
+- Branch from `dev` (`feature/<what>`), pull request into `dev`, one review. `main` gets the final version.
+- Pull requests need the `checks` workflow (lint and tests) to pass.
 - Data, `.env` and models never go to GitHub.
 - Code shared by more than one notebook goes in `src/`.
