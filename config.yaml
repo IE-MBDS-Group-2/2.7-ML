@@ -1,0 +1,14 @@
+# config.yaml  [Single source of truth for non-secret settings]
+# Change settings here, never hardcode them in notebooks.
+
+paths:
+  raw: data/raw
+  processed: data/processed
+  models: models
+  figures: reports/figures
+
+problem:
+  target: null            # set once the project is chosen
+  type: null              # classification or regression
+
+random_state: 42
