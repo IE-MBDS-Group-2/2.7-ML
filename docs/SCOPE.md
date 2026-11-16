@@ -1,0 +1,151 @@
+# Scope: corporate bond pricing with machine learning
+
+**Due:** Blackboard, **Sun 22 Nov 2026, 23:59** (one zip, `Group <name>.zip`). Presentation: 12 minutes plus 5 minutes
+of questions. The professor can ask **anyone** about **any** ML II topic, not only our project.
+
+## 1. The project in one paragraph
+
+A bank's pricing team has to put a fair value on thousands of corporate bonds every day, for client statements,
+fund valuations and risk reports. Most bonds do not trade on a given day, so there is no market price to copy.
+The usual fallback is **matrix pricing**: look up a typical spread for the bond's rating, maturity and sector, and
+apply it. We predict each bond's **credit spread** from its terms, its trading activity, the issuing company's
+stock and balance sheet, and the market backdrop, and test whether machine learning beats matrix pricing.
+Every ML II model family gets a role: decision trees, bagging, random forest and boosting, KNN, a neural network,
+and Naive Bayes on a classification variant in the technical annex.
+
+**Audience for the report:** the head of a bank's bond pricing team, not the professor.
+
+## 2. Finance primer (5 minutes)
+
+| Term | Meaning |
+|---|---|
+| **Corporate bond** | A loan to a company that investors can buy and sell. It pays a fixed **coupon** every year and repays the **face value** at **maturity** |
+| **Yield** | The annual return you get if you buy the bond at today's price and hold it to maturity. Price up = yield down |
+| **Treasury yield** | The yield of a US government bond: the "risk-free" benchmark for the same maturity |
+| **Credit spread** | Bond yield minus Treasury yield of the same maturity. The extra return investors want for the risk that the company does not pay. Measured in **basis points** (bp): 1 bp = 0.01%, so 150 bp = 1.5% |
+| **Investment grade (IG) / high yield (HY)** | Safer companies (spreads around 50 to 200 bp) versus riskier ones (around 250 to 1,000 bp). Our two strata |
+| **Matrix pricing** | Today's fallback: average spread for similar bonds (rating x maturity x sector). Our baseline |
+| **TRACE** | The US regulator's record of every corporate bond trade. Our source of real yields and volumes |
+| **Liquidity** | How often and how much a bond trades. Rarely traded bonds usually carry a higher spread |
+| **Equity signals** | When a company's stock is volatile, falling or highly leveraged, its bonds usually have higher spreads. That is why the issuer's stock data are features |
+
+## 3. What the brief asks for
+
+| Deliverable | Where it comes from | Owner |
+|---|---|---|
+| Summary report, max 4 pages: executive summary, technical approach, best solution, recommendations for managers | Results of sections 6 to 8 | Report and deck lead |
+| Technical annex | EDA, every model's runs (`notebooks/RUN_LOG.md`), validation detail, the Naive Bayes classification variant | Each owner writes their own part |
+| Database plus explanation of the variables | `bond_month_panel.parquet` and [DATA_DICTIONARY.md](DATA_DICTIONARY.md) | Miguel |
+| Final notebook | `notebooks/99_final.ipynb`, runs top to bottom from the panel | Miguel (integration), with each owner's code |
+| Presentation | Deck, 12 minutes, every member presents what they built | Report and deck lead |
+
+Graded points: executive summary, professional look, EDA, data processing and feature work, technical approach,
+**validation strategy**, model evaluation, conclusions and recommendations, technical annex.
+
+## 4. Data
+
+One table, `bond_month_panel`: one row per bond per month-end, January 2024 to March 2026. Miguel prepares it from
+TRACE (via IE's WRDS subscription), the US Treasury yield curve, market indicators and the issuers' stock prices
+and balance sheets. You get it through the read-only group database or as a parquet file:
+[DATA_ACCESS.md](DATA_ACCESS.md). Every column is explained in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
+
+- **Bonds kept:** straight fixed-coupon corporate bonds of companies with a listed stock, traded on the month-end
+  day, 1 to 30.5 years to maturity.
+- **Size:** about 181,000 bond-months: some 13,800 bonds from about 800 companies over 27 month-ends, about
+  6,700 bonds per snapshot. Most rows are flagged investment grade (about 85%). Exact counts are in the data
+  dictionary ("Last build").
+- **Licensed data:** it stays in the group and in the submission zip. Never commit it or share it.
+
+## 5. Target and features
+
+**Target:** `spread_bps`, the bond's yield minus the Treasury yield at the same maturity, in basis points (regression).
+
+**Features** (all already in the table; `ml2.schema.feature_columns()` lists them):
+
+| Group | Examples | Why it should matter |
+|---|---|---|
+| Bond terms | years to maturity, coupon, IG/HY, seniority, 144A | Longer, junior and lower-grade bonds pay more |
+| Liquidity | trades, volume, days traded in the month | Illiquid bonds pay a premium |
+| Issuer | number of bonds outstanding, sector | Bigger issuers trade more; sectors differ in risk |
+| Issuer's stock | volatility, past return, beta, market cap, leverage, distance to default | The stock market's view of the company's risk |
+| Market | Treasury yields, curve slope, high-yield and BBB index spreads, VIX, SOFR | Spreads move together with the market |
+
+**Not features:** `yield_pct`, `ust_yield_at_maturity_pct` and `price` contain the target; the annex columns contain
+the future. Using any of them is leakage.
+
+## 6. Models
+
+| Role | Model | Why it is here |
+|---|---|---|
+| **Baseline, the bar to beat** | Matrix pricing: average training spread per grade x maturity bucket x sector (or the equivalent linear regression on those dummies) | What pricing teams do today |
+| Interpretable | Regression tree, pruned (grid search, then cost-complexity pruning) | Rules a pricing team can read |
+| Ensembles | Bagging, random forest, gradient boosting (scikit-learn, LightGBM or XGBoost) | Likely the most accurate on tables like ours |
+| Comparable bonds | KNN regression, k tuned, scaled features | "Price a bond from its most similar bonds": how traders already think |
+| Neural network | MLP regressor, standardized inputs, early stopping | Intro to deep learning; we have enough rows for it to compete |
+| Classification annex | Naive Bayes plus every model above as classifiers | Section 8 |
+
+**Metrics** (`ml2.evaluate`): mean absolute error (MAE), RMSE and median absolute error in basis points, and RÂ².
+Always reported separately for IG and HY and by maturity bucket, not only overall.
+
+**Quality gate, fixed now, before any training** (`config.yaml`): the best model must beat matrix pricing on test
+MAE by at least 10% in **both** IG and HY. If no model does, our recommendation is "keep matrix pricing", and that
+is still a valid, honest report.
+
+## 7. Validation (`ml2.splits`)
+
+**No random splits.** Bonds of the same company on the same date move together, and a bond's spread this month is
+close to last month's. A random split puts near-copies of test rows into training and makes every model look
+better than it is.
+
+- **Partitions** (column `partition`): train 2024-01 to 2025-05 (17 month-ends), *gap* 2025-06, valid 2025-07 to
+  2025-10, *gap* 2025-11, test 2025-12 to 2026-03. The gap months are left out to limit leakage.
+- **Tuning:** `walk_forward_folds()`: train on earlier months, validate on later ones, inside the training window.
+- **Two questions, two evaluations:**
+  - *Value a bond that did not trade today* (the company is known): the chronological partitions above.
+  - *Value a bond from a company the model has never seen:* `issuer_group_folds()`, so none of that company's
+    bonds are in training. Harder, and where KNN versus boosting gets interesting.
+- **Test partition:** opened once, at the end, for the final table. Nobody looks at it before.
+- **Run log:** every run, including dropped variants, in `notebooks/RUN_LOG.md`. It feeds the technical annex.
+
+## 8. Classification variant (technical annex)
+
+Target `widens_25bp`: 1 if the bond's spread is 25 bp or more wider at the next month-end, 0 if not. Bin the
+features for Categorical Naive Bayes, and run Gaussian Naive Bayes as a contrast. Compare Naive Bayes, KNN, tree,
+random forest, boosting and MLP on ROC AUC and log loss against always predicting the base rate. A weak result is
+fine: the point is to show every classifier from the course, and to explain why Naive Bayes's independence
+assumption hurts when features are correlated (for example `vol_20d` and `vol_60d`).
+
+## 9. Roles
+
+| Role | Notebook |
+|---|---|
+| Data and integration (Miguel) | `00_data_access`, `99_final` |
+| EDA and baseline | `01_eda`, `02_baseline_matrix_pricing` |
+| Trees and ensembles | `03_trees_ensembles` |
+| KNN comparable bonds | `04_knn_comparables` |
+| Neural network | `05_neural_network` |
+| Classification annex (Naive Bayes) | `06_annex_classification` |
+| Report and deck | report, annex assembly, deck |
+
+With fewer people, one person takes two roles (KNN plus the annex fit together well). Everyone presents what they built.
+
+## 10. Plan
+
+| Day | Work | Output |
+|---|---|---|
+| Mon 16 | Repo and data ready, roles agreed, everyone set up | Logins sent, environment working |
+| Tue 17 | EDA and matrix-pricing baseline; others set up and start on train/valid | `01_eda`, `02_baseline` |
+| Wed 18 | Trees, ensembles, KNN | Validation results in the run log |
+| Thu 19 | Neural network, classification annex | Validation results in the run log |
+| Fri 20 | Choose the best model on validation, then open the test partition **once**. Interpretation | Final results table |
+| Sat 21 | Report (4 pages), technical annex, deck | Drafts |
+| Sun 22 | Dry run, fixes, zip, submit before 23:59 | Submission |
+
+## 11. Known limits (say them in the report, briefly)
+
+- The reported yield is "yield to worst" for bonds the company can repay early (callable bonds); we have no call
+  schedules, so those spreads carry some noise.
+- The IG/HY grade flag is today's, not the one on each snapshot date, and it is noisy: some large banks' small
+  retail notes are flagged HY. How we define the IG and HY strata is an open decision for the EDA.
+- The last snapshot is 17 March 2026 (where the data ends), not a month-end.
+- Two years of history, one interest-rate regime: results may not hold in a crisis.

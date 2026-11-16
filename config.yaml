@@ -1,14 +1,28 @@
 # config.yaml  [Single source of truth for non-secret settings]
-# Change settings here, never hardcode them in notebooks.
+# Read by src/ml2/config.py. Change settings here, never hardcode them in notebooks.
 
 paths:
-  raw: data/raw
-  processed: data/processed
-  models: models
-  figures: reports/figures
+  panel_parquet: data/processed/bond_month_panel.parquet
+  manifest: data/processed/manifest.json
 
 problem:
-  target: null            # set once the project is chosen
-  type: null              # classification or regression
+  target: spread_bps                # regression target (main report)
+  annex_target: widens_25bp         # classification target (technical annex, Naive Bayes)
+  widen_threshold_bps: 25
+  id_columns: [cusip_id, snapshot_date]
+  group_column: issuer_ticker       # for issuer-grouped validation
 
-random_state: 42
+split:
+  # Chronological, with one empty month between partitions to limit leakage.
+  train_end: "2025-05-31"           # 2024-01 .. 2025-05 (17 month-ends)
+  valid_start: "2025-07-01"         # 2025-06 is the gap
+  valid_end: "2025-10-31"           # 2025-07 .. 2025-10 (4 month-ends)
+  test_start: "2025-12-01"          # 2025-11 is the gap
+  test_end: "2026-03-31"            # 2025-12 .. 2026-03 (4 snapshots; opened once at the end)
+
+quality_gate:
+  # Fixed before any training run. Do not move it after seeing results.
+  metric: mae_bps
+  baseline: matrix_pricing
+  min_improvement: 0.10             # best model must beat the baseline by >= 10% ...
+  strata: [IG, HY]                  # ... in every stratum, on the test partition
