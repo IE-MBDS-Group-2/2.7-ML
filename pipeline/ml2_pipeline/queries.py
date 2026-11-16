@@ -1,0 +1,94 @@
+"""SQL against the LDP mart. All read-only."""
+
+SNAPSHOT_DATES = """
+select max(trade_date) as snapshot_date
+from credit.trace_daily
+where trade_date between :start and :end
+group by date_trunc('month', trade_date)
+order by 1
+"""
+
+# One row per bond per month-end snapshot, with month-level liquidity.
+TRACE_BONDS_MONTH_END = """
+with me as (
+    select unnest(cast(:snapshots as date[])) as snapshot_date
+),
+ref as (
+    select cusip_id, upper(company_symbol) as issuer_ticker, issuer_nm, scrty_ds, debt_type_cd,
+           cpn_rt, mtrty_dt, ind_144a, grade, stdt
+    from credit.bond_reference
+    where sub_prdct_type = 'CORP'
+      and cpn_type_cd = :coupon_type
+      and coalesce(cnvrb_fl, 'N') = 'N'
+      and company_symbol is not null
+      and cpn_rt is not null
+      and mtrty_dt is not null
+),
+monthly as (
+    select t.cusip_id,
+           cast(date_trunc('month', t.trade_date) as date) as month,
+           count(*) as trade_days_in_month,
+           sum(t.par_volume) as par_volume_month,
+           sum(t.n_trades) as n_trades_month
+    from credit.trace_daily t
+    join ref r on r.cusip_id = t.cusip_id
+    where t.trade_date between :start and :end
+    group by 1, 2
+)
+select me.snapshot_date, r.cusip_id, r.issuer_ticker, r.issuer_nm, r.scrty_ds, r.debt_type_cd,
+       r.cpn_rt, r.mtrty_dt, r.ind_144a, r.grade, r.stdt,
+       t.n_trades, t.par_volume, t.vwap_price, t.last_price, t.vw_yield,
+       t.n_trades_inst, t.par_volume_inst, t.vwap_price_inst, t.n_trades_customer,
+       m.trade_days_in_month, m.par_volume_month, m.n_trades_month
+from credit.trace_daily t
+join me on t.trade_date = me.snapshot_date
+join ref r on r.cusip_id = t.cusip_id
+left join monthly m
+       on m.cusip_id = t.cusip_id
+      and m.month = cast(date_trunc('month', me.snapshot_date) as date)
+where t.vw_yield is not null
+"""
+
+MACRO_SERIES = """
+select series_id, date, value
+from macro.series_daily
+where series_id = any(:series)
+  and date between :start and :end
+"""
+
+# Filter on ts_event (indexed), not on date: see the view comment in LDP.
+PRICES = """
+select date, ticker, adj_close, raw_close, entity_id
+from mart.prices_daily_v2
+where ts_event >= cast(:start as timestamptz)
+  and ts_event < cast(:end as timestamptz) + interval '1 day'
+  and ticker = any(:tickers)
+"""
+
+SHARES = """
+select entity_id, date, shares_outstanding
+from entities.shares_daily
+where entity_id = any(:entity_ids)
+  and date >= cast(:start as date)
+"""
+
+BALANCE_SHEET = """
+select ticker, date as period_end, filing_date, total_debt
+from fundamentals.balance_sheet
+where period = 'quarter'
+  and ticker = any(:tickers)
+  and date >= cast(:start as date)
+"""
+
+SECTOR_HISTORY = """
+select ticker, valid_from, valid_to, gics_sector_name, source
+from universes.sector_history
+where ticker = any(:tickers)
+  and gics_sector_name is not null
+"""
+
+SECTOR_PROFILE = """
+select ticker, sector
+from fundamentals.company_profile
+where ticker = any(:tickers)
+"""

@@ -1,0 +1,46 @@
+# Group database + Dagster loader.
+#   docker compose up -d groupdb          # database only
+#   docker compose up -d --build          # database + Dagster UI on http://localhost:3000
+# Settings come from .env (see .env.example).
+
+services:
+  groupdb:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ml2
+      POSTGRES_USER: ${GROUP_DB_ADMIN_USER:-ml2_admin}
+      POSTGRES_PASSWORD: ${GROUP_DB_ADMIN_PASSWORD:?Set GROUP_DB_ADMIN_PASSWORD in .env}
+    ports:
+      # Bound to 127.0.0.1 by default: private to this machine until you decide how to host it.
+      - "${GROUP_DB_BIND:-127.0.0.1}:${GROUP_DB_PORT:-5433}:5432"
+    volumes:
+      - groupdb-data:/var/lib/postgresql/data
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GROUP_DB_ADMIN_USER:-ml2_admin} -d ml2"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  dagster:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      LDP_DB_URL: ${LDP_DB_URL:?Set LDP_DB_URL in .env}
+      GROUP_DB_URL: ${GROUP_DB_URL:?Set GROUP_DB_URL in .env}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml:ro
+      - dagster-home:/opt/dagster/home
+    depends_on:
+      groupdb:
+        condition: service_healthy
+
+volumes:
+  groupdb-data:
+  dagster-home:
