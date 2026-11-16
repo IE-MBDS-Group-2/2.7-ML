@@ -10,8 +10,9 @@ fund valuations and risk reports. Most bonds do not trade on a given day, so the
 The usual fallback is **matrix pricing**: look up a typical spread for the bond's rating, maturity and sector, and
 apply it. We predict each bond's **credit spread** from its terms, its trading activity, the issuing company's
 stock and balance sheet, and the market backdrop, and test whether machine learning beats matrix pricing.
-Every ML II model family gets a role: decision trees, bagging, random forest and boosting, KNN, a neural network,
-and Naive Bayes on a classification variant in the technical annex.
+Every ML II method with a class notebook gets a role, and our code follows that notebook: decision trees, bagging,
+random forest and boosting (XGBoost, LightGBM), KNN, and Naive Bayes on a classification variant in the technical
+annex. The neural network is on standby until its class notebook is released.
 
 **Audience for the report:** the head of a bank's bond pricing team, not the professor.
 
@@ -75,16 +76,19 @@ the future. Using any of them is leakage.
 
 ## 6. Models
 
-| Role | Model | Why it is here |
-|---|---|---|
-| **Baseline, the bar to beat** | Matrix pricing: average training spread per grade x maturity bucket x sector (or the equivalent linear regression on those dummies) | What pricing teams do today |
-| Interpretable | Regression tree, pruned (grid search, then cost-complexity pruning) | Rules a pricing team can read |
-| Ensembles | Bagging, random forest, gradient boosting (scikit-learn, LightGBM or XGBoost) | Likely the most accurate on tables like ours |
-| Comparable bonds | KNN regression, k tuned, scaled features | "Price a bond from its most similar bonds": how traders already think |
-| Neural network | MLP regressor, standardized inputs, early stopping | Intro to deep learning; we have enough rows for it to compete |
-| Classification annex | Naive Bayes plus every model above as classifiers | Section 8 |
+| Role | Model | Class notebook it follows | Why it is here |
+|---|---|---|---|
+| **Baselines, the bar to beat** | Median of the training spreads; matrix pricing (median spread per grade x maturity bucket x sector) | Regression_Improve Bagg & RF with Boosting | The class baseline, and what pricing teams do today |
+| Interpretable | Regression tree, pruned by depth and leaf size, then cost-complexity pruning with the 1-SE rule | RTrees_boston | Rules a pricing team can read |
+| Ensembles | Bagging, random forest, XGBoost, LightGBM; out-of-bag error, permutation importance, SHAP | Regression_Improve Bagg & RF with Boosting, RF_risk | Likely the most accurate on tables like ours |
+| Comparable bonds | KNN regression, k tuned, scaled features, bagged KNN | 2. KNN_IBM attrition | "Price a bond from its most similar bonds": how traders already think |
+| Classification annex | Gaussian and Categorical Naive Bayes against the other classifiers, threshold from out-of-fold predictions | 2. Naive_Bayes_SMS | Section 8 |
+| *On standby* | Neural network (MLP) | None yet | Added only if its class notebook is released in time |
 
-**Metrics** (`ml2.evaluate`): mean absolute error (MAE), RMSE and median absolute error in basis points, and RÂ².
+Adaptations to the class notebooks, the same everywhere: time-ordered folds from `ml2.splits` instead of shuffled
+`KFold`, the shared preprocessing from `ml2.features`, and grid searches on a 30% sample of the 114k training rows.
+
+**Metrics** (`ml2.evaluate`): mean absolute error (MAE), RMSE and median absolute error in basis points, and R².
 Always reported separately for IG and HY and by maturity bucket, not only overall.
 
 **Quality gate, fixed now, before any training** (`config.yaml`): the best model must beat matrix pricing on test
@@ -111,8 +115,9 @@ better than it is.
 
 Target `widens_25bp`: 1 if the bond's spread is 25 bp or more wider at the next month-end, 0 if not. Bin the
 features for Categorical Naive Bayes, and run Gaussian Naive Bayes as a contrast. Compare Naive Bayes, KNN, tree,
-random forest, boosting and MLP on ROC AUC and log loss against always predicting the base rate. A weak result is
-fine: the point is to show every classifier from the course, and to explain why Naive Bayes's independence
+random forest and boosting on ROC AUC and log loss against always predicting the base rate, and choose the decision
+threshold on out-of-fold predictions as in the class notebook. A weak result is
+fine: the point is to show the classifiers from the course, and to explain why Naive Bayes's independence
 assumption hurts when features are correlated (for example `vol_20d` and `vol_60d`).
 
 ## 9. Roles
@@ -123,8 +128,8 @@ assumption hurts when features are correlated (for example `vol_20d` and `vol_60
 | EDA and baseline | `01_eda`, `02_baseline_matrix_pricing` |
 | Trees and ensembles | `03_trees_ensembles` |
 | KNN comparable bonds | `04_knn_comparables` |
-| Neural network | `05_neural_network` |
 | Classification annex (Naive Bayes) | `06_annex_classification` |
+| *Neural network: on standby* | `05_neural_network`, empty until its class notebook exists |
 | Report and deck | report, annex assembly, deck |
 
 With fewer people, one person takes two roles (KNN plus the annex fit together well). Everyone presents what they built.
@@ -136,7 +141,7 @@ With fewer people, one person takes two roles (KNN plus the annex fit together w
 | Mon 16 | Repo and data ready, roles agreed, everyone set up | Logins sent, environment working |
 | Tue 17 | EDA and matrix-pricing baseline; others set up and start on train/valid | `01_eda`, `02_baseline` |
 | Wed 18 | Trees, ensembles, KNN | Validation results in the run log |
-| Thu 19 | Neural network, classification annex | Validation results in the run log |
+| Thu 19 | Classification annex; model choices frozen | Validation results in the run log |
 | Fri 20 | Choose the best model on validation, then open the test partition **once**. Interpretation | Final results table |
 | Sat 21 | Report (4 pages), technical annex, deck | Drafts |
 | Sun 22 | Dry run, fixes, zip, submit before 23:59 | Submission |
