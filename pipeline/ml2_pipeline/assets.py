@@ -49,7 +49,10 @@ def _series_asof(long: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.DataFrame:
 def snapshot_dates(context: AssetExecutionContext, ldp: PostgresResource) -> pd.DataFrame:
     """Month-end snapshot dates: the last TRACE trading day of each month."""
     ex = _cfg()["extract"]
-    df = ldp.read(queries.SNAPSHOT_DATES, {"start": ex["start_date"], "end": ex["end_date"]})
+    df = ldp.read(
+        queries.SNAPSHOT_DATES,
+        {"start": ex["start_date"], "end": ex["end_date"], "min_bonds": ex["min_bonds_per_snapshot_day"]},
+    )
     context.add_output_metadata({"n_snapshots": len(df), "first": str(df.iloc[0, 0]), "last": str(df.iloc[-1, 0])})
     return df
 

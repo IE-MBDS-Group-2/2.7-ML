@@ -10,6 +10,7 @@ extract:
   start_date: "2024-01-01"            # first TRACE month in the source
   end_date: "2026-03-31"              # TRACE Enhanced ends 2026-03-17
   equity_history_start: "2023-01-01"  # one year of prices before the first snapshot
+  min_bonds_per_snapshot_day: 2000    # a normal day has about 11k bonds; skips holidays like Good Friday
   coupon_type: FXPV                   # fixed-rate plain-vanilla coupons only
   min_years_to_maturity: 1.0
   max_years_to_maturity: 30.5

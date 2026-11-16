@@ -1,9 +1,17 @@
 """SQL against the LDP mart. All read-only."""
 
+# The last day of each month with a normal trading volume. Thin days (e.g. Good Friday,
+# when the bond market is closed but a few trades are still reported) are skipped.
 SNAPSHOT_DATES = """
+with daily as (
+    select trade_date, count(*) as n_bonds
+    from credit.trace_daily
+    where trade_date between :start and :end
+    group by trade_date
+)
 select max(trade_date) as snapshot_date
-from credit.trace_daily
-where trade_date between :start and :end
+from daily
+where n_bonds >= :min_bonds
 group by date_trunc('month', trade_date)
 order by 1
 """
