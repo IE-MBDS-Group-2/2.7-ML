@@ -6,7 +6,7 @@ The lab. One owner per notebook; shared code goes in `src/ml2`, not copied betwe
 |---|---|---|
 | `00_data_access.ipynb` | Connect, load the panel, first look | Miguel |
 | `01_eda.ipynb` | Exploratory analysis: spreads by grade, maturity, sector; missing values; outliers | |
-| `02_baseline_matrix_pricing.ipynb` | Matrix-pricing baseline (the bar to beat) | |
+| `02_baseline_matrix_pricing.ipynb` | Baselines from `ml2.baseline`: matrix pricing re-marked each date (the bar to beat), frozen matrix and median for reference | |
 | `03_trees_ensembles.ipynb` | Regression tree, bagging, random forest, gradient boosting | |
 | `04_knn_comparables.ipynb` | KNN "comparable bonds" pricing | |
 | `05_neural_network.ipynb` | On standby: MLP regressor, only once its class notebook is released | |

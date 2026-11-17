@@ -52,7 +52,8 @@ X_cols = feature_columns()                  # allowed model inputs
 │   ├── schema.py            #   columns, meanings, allowed features
 │   ├── features.py          #   xy() and the shared preprocessing recipe
 │   ├── splits.py            #   chronological partitions, walk-forward and issuer-grouped folds
-│   └── evaluate.py          #   metrics in basis points, by stratum, quality gate
+│   ├── baseline.py          #   median and matrix-pricing baselines (one definition for everyone)
+│   └── evaluate.py          #   metrics in basis points, by stratum, quality gate with bootstrap interval
 ├── scripts/                 # write_data_dictionary.py
 ├── data/                    # gitignored: processed/bond_month_panel.parquet if you use the file
 ├── models/                  # gitignored: saved models
@@ -65,7 +66,7 @@ X_cols = feature_columns()                  # allowed model inputs
 - **Data never goes to GitHub.** It is licensed. It lives in the group database and in the submission zip only.
 - **No random splits.** Use `ml2.splits`: chronological partitions with a one-month gap, plus issuer-grouped folds.
 - **The test partition is opened once**, at the end, for the final results table.
-- **The quality gate is fixed** in `config.yaml` before any training. Do not change it after seeing results.
+- **The quality gate is fixed** in `config.yaml` (tightened once, before any logged run; see `docs/SCOPE.md`). Do not change it after seeing results.
 - **Log every model run** (including dropped ideas) in `notebooks/RUN_LOG.md`.
 - **Shared code goes in `src/ml2`**, not copied between notebooks.
 - Branch from `dev` (`feature/<what>`), open a pull request into `dev`, get one review. `main` gets the final version.

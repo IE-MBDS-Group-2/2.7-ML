@@ -78,7 +78,7 @@ the future. Using any of them is leakage.
 
 | Role | Model | Class notebook it follows | Why it is here |
 |---|---|---|---|
-| **Baselines, the bar to beat** | Median of the training spreads; matrix pricing (median spread per grade x maturity bucket x sector) | Regression_Improve Bagg & RF with Boosting | The class baseline, and what pricing teams do today |
+| **Baselines, the bar to beat** (`ml2.baseline`) | Matrix pricing re-marked on every snapshot date: median same-date spread of other companies' bonds in the grade x maturity bucket x sector cell (the gate baseline). Reference rows: the median of the training spreads, and matrix pricing frozen at the training months | Regression_Improve Bagg & RF with Boosting | What pricing teams do today, and the class baseline |
 | Interpretable | Regression tree, pruned by depth and leaf size, then cost-complexity pruning with the 1-SE rule | RTrees_boston | Rules a pricing team can read |
 | Ensembles | Bagging, random forest, XGBoost, LightGBM; out-of-bag error, permutation importance, SHAP | Regression_Improve Bagg & RF with Boosting, RF_risk | Likely the most accurate on tables like ours |
 | Comparable bonds | KNN regression, k tuned, scaled features, bagged KNN | 2. KNN_IBM attrition | "Price a bond from its most similar bonds": how traders already think |
@@ -91,9 +91,20 @@ Adaptations to the class notebooks, the same everywhere: time-ordered folds from
 **Metrics** (`ml2.evaluate`): mean absolute error (MAE), RMSE and median absolute error in basis points, and R².
 Always reported separately for IG and HY and by maturity bucket, not only overall.
 
-**Quality gate, fixed now, before any training** (`config.yaml`): the best model must beat matrix pricing on test
-MAE by at least 10% in **both** IG and HY. If no model does, our recommendation is "keep matrix pricing", and that
-is still a valid, honest report.
+**Quality gate, fixed before any logged run** (`config.yaml`, checked by `ml2.evaluate.gate_report`): against
+matrix pricing re-marked on every snapshot date, the best model must cut test MAE by at least 10% **and** the 95%
+interval of that improvement must lie above zero, in **both** IG and HY. The interval comes from resampling whole
+companies (1,000 draws), because a company's bonds move together. If no model passes, our recommendation is "keep
+matrix pricing", and that is still a valid, honest report.
+
+Why these numbers: replacing a transparent lookup with a model costs validation, governance and explaining marks to
+auditors, so the gain must be material (10%); and with four test months and a few hundred companies per grade, a
+smaller gain cannot be told apart from luck (the interval condition).
+
+*Change log.* 17 Nov 2026, before any logged run and with test unopened: the baseline was tightened from matrix
+pricing frozen at the training months to matrix pricing re-marked on each date, the way a desk marks it, and the
+interval condition was added. A train/valid-only feasibility check showed the frozen matrix was too easy a bar.
+The frozen version stays in the final table as a reference row.
 
 ## 7. Validation (`ml2.splits`)
 
