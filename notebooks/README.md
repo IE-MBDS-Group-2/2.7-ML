@@ -11,7 +11,7 @@ The lab. One owner per notebook; shared code goes in `src/ml2`, not copied betwe
 | `04_knn_comparables.ipynb` | KNN "comparable bonds" pricing | |
 | `05_neural_network.ipynb` | On standby: MLP regressor, only once its class notebook is released | |
 | `06_annex_classification.ipynb` | `widens_25bp`: Naive Bayes and every classifier | |
-| `99_final.ipynb` | The final notebook for the submission: runs top to bottom from the panel | |
+| `99_final.ipynb` | The final notebook for the submission: runs top to bottom from the panel, scores test once and runs the quality gate (`gate_report` against matrix pricing re-marked each date) | |
 
 Rules: import splits and metrics from `ml2`, never split randomly, do not touch `partition == "test"`
 until the final table, and add a line to `RUN_LOG.md` for every model run.

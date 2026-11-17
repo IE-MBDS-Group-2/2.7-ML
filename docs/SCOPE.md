@@ -25,7 +25,7 @@ annex. The neural network is on standby until its class notebook is released.
 | **Treasury yield** | The yield of a US government bond: the "risk-free" benchmark for the same maturity |
 | **Credit spread** | Bond yield minus Treasury yield of the same maturity. The extra return investors want for the risk that the company does not pay. Measured in **basis points** (bp): 1 bp = 0.01%, so 150 bp = 1.5% |
 | **Investment grade (IG) / high yield (HY)** | Safer companies (spreads around 50 to 200 bp) versus riskier ones (around 250 to 1,000 bp). Our two strata |
-| **Matrix pricing** | Today's fallback: average spread for similar bonds (rating x maturity x sector). Our baseline |
+| **Matrix pricing** | Today's fallback: the median spread of similar bonds (rating x maturity x sector) that traded that day, re-marked every day. Our baseline and the bar for the quality gate |
 | **TRACE** | The US regulator's record of every corporate bond trade. Our source of real yields and volumes |
 | **Liquidity** | How often and how much a bond trades. Rarely traded bonds usually carry a higher spread |
 | **Equity signals** | When a company's stock is volatile, falling or highly leveraged, its bonds usually have higher spreads. That is why the issuer's stock data are features |

@@ -4,7 +4,7 @@ Machine Learning II group project, IE MBDS (Group 2). **Due Sun 22 Nov 2026, 23:
 
 A bank's pricing team has to put a fair price on thousands of corporate bonds every day, but most bonds do not
 trade on a given day. Today the fallback is **matrix pricing**: a spread looked up from rating, maturity and
-sector buckets. We predict each bond's **credit spread** (its extra yield over a Treasury bond of the same maturity)
+sector buckets, re-marked each day from the bonds that did trade. We predict each bond's **credit spread** (its extra yield over a Treasury bond of the same maturity)
 from the bond's terms, how often it trades, the issuing company's stock and balance sheet, and the market backdrop,
 and test whether machine learning beats matrix pricing.
 
