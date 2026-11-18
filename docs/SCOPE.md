@@ -47,7 +47,7 @@ Graded points: executive summary, professional look, EDA, data processing and fe
 
 One table, `bond_month_panel`: one row per bond per month-end, January 2024 to March 2026. Miguel prepares it from
 TRACE (via IE's WRDS subscription), the US Treasury yield curve, market indicators and the issuers' stock prices
-and balance sheets. You get it through the read-only group database or as a parquet file:
+and balance sheets. You get it as a checksum-verified parquet file from the private group folder (a read-only group database is optional):
 [DATA_ACCESS.md](DATA_ACCESS.md). Every column is explained in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
 - **Bonds kept:** straight fixed-coupon corporate bonds of companies with a listed stock, traded on the month-end
@@ -155,7 +155,7 @@ real numbers. Every issue closes through a pull request into `dev`, reviewed by 
 |---|---|---|---|---|
 | P1 | Decision: agree roles, the IG/HY strata and the quality gate on the kickoff call | 1 | 0 (Wed 18) | Owners filled in above; decisions written here |
 | P2 | Setup: scaffold, shared `ml2` package, config and CI on `dev` | 1 | 0 (Wed 18) | PRs #1 and #2 merged; `pytest` and `flake8` pass in CI |
-| P3 | Data: group database, read-only logins and the parquet fallback | 1 | 0 (Wed 18) | Everyone runs `00_data_access` and sees the row counts by partition |
+| P3 | Data: the shared parquet file and its checksum check (group database optional) | 1 | 0 (Wed 18) | Everyone runs `00_data_access` and sees the row counts by partition |
 | P4 | Notebook: `01_eda`, the target, gaps, correlations and the IG/HY definition | 2 | 1 (Thu 19) | Figures in `reports/figures/`; the strata decision posted to the team |
 | P5 | Notebook: `02_baseline_matrix_pricing`, the three baselines on valid | 2 | 1 (Thu 19) | Valid MAE for IG, HY and all in RUN_LOG; slide 7 figure saved |
 | P6 | Model: regression tree with cost-complexity pruning | 3 | 1 (Thu 19) | Best alpha from time-ordered folds; valid MAE in RUN_LOG |
@@ -176,7 +176,7 @@ real numbers. Every issue closes through a pull request into `dev`, reviewed by 
 
 | Day | Work | Output | Issues |
 |---|---|---|---|
-| Wed 18 | Project chosen, roles agreed, everyone set up with data access; EDA starts | Logins or parquet sent, environment working | P1 to P3 |
+| Wed 18 | Project chosen, roles agreed, everyone set up with data access; EDA starts | Parquet shared, environment working | P1 to P3 |
 | Thu 19 | EDA and baselines (the baseline code is ready); first tree and KNN runs. Light day: ML Ops presentation | `01_eda`, `02_baseline`, first runs in the log | P4 to P6, P9 |
 | Fri 20 | Ensembles, bagged KNN and the new-company test, Naive Bayes annex; model settings frozen by the evening | Validation results in the run log | P7, P8, P10 to P12 |
 | Sat 21 | Morning: choose the best model on validation, then open the test partition **once**. Afternoon: report, annex and deck drafts | Final results table, drafts | P13, P14 |

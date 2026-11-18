@@ -1,18 +1,22 @@
 """Load the modelling panel.
 
 Two sources, same columns:
-    1. The group database (table ml2.bond_month_panel), when ML2_DB_URL is set in .env
-    2. The parquet file in data/processed/, otherwise
+    1. The parquet file in data/processed/ (the default: leave ML2_DB_URL empty)
+    2. The group database (table ml2.bond_month_panel), when ML2_DB_URL is set in .env
 
 Example
-    from ml2.data import load_panel
+    from ml2.data import check_panel, load_panel
+    check_panel()                           # your parquet file is the shared version
     df = load_panel()                       # whole panel
     train = load_panel(partitions=["train"])
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
@@ -72,6 +76,31 @@ def load_panel(
     if "snapshot_date" in df.columns:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     return df.reset_index(drop=True)
+
+
+def check_panel(parquet: str | Path | None = None, manifest: str | Path | None = None) -> dict:
+    """Check that the local parquet file is the shared version: its sha256 must match manifest.json.
+
+    Returns the manifest (build time, row counts by partition and grade) when the file matches.
+    Raises FileNotFoundError if either file is missing and ValueError if the checksum differs.
+    """
+    paths = load_config()["paths"]
+    parquet = Path(parquet) if parquet else resolve(paths["panel_parquet"])
+    manifest = Path(manifest) if manifest else resolve(paths["manifest"])
+    for p in (parquet, manifest):
+        if not p.exists():
+            raise FileNotFoundError(f"{p} not found. Put both files from the shared folder in data/processed/.")
+    info = json.loads(manifest.read_text(encoding="utf-8"))
+    digest = hashlib.sha256()
+    with open(parquet, "rb") as fh:
+        for block in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(block)
+    if digest.hexdigest() != info["sha256"]:
+        raise ValueError(
+            f"{parquet.name} does not match manifest.json (sha256 {digest.hexdigest()[:12]}... vs "
+            f"{info['sha256'][:12]}...). Download both files again from the shared folder."
+        )
+    return info
 
 
 def load_column_dictionary() -> pd.DataFrame:
