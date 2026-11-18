@@ -153,22 +153,22 @@ real numbers. Every issue closes through a pull request into `dev`, reviewed by 
 
 | # | Issue | Role | Wave | Done when |
 |---|---|---|---|---|
-| P1 | Decision: agree roles, the IG/HY strata and the quality gate on the kickoff call | 1 | 0 (Mon 16) | Owners filled in above; decisions written here |
-| P2 | Setup: scaffold, shared `ml2` package, config and CI on `dev` | 1 | 0 (Mon 16) | PRs #1 and #2 merged; `pytest` and `flake8` pass in CI |
-| P3 | Data: group database, read-only logins and the parquet fallback | 1 | 0 (Mon 16) | Everyone runs `00_data_access` and sees the row counts by partition |
-| P4 | Notebook: `01_eda`, the target, gaps, correlations and the IG/HY definition | 2 | 1 (Tue 17) | Figures in `reports/figures/`; the strata decision posted to the team |
-| P5 | Notebook: `02_baseline_matrix_pricing`, the three baselines on valid | 2 | 1 (Tue 17) | Valid MAE for IG, HY and all in RUN_LOG; slide 7 figure saved |
-| P6 | Model: regression tree with cost-complexity pruning | 3 | 1 (Tue 17) | Best alpha from time-ordered folds; valid MAE in RUN_LOG |
-| P7 | Model: bagging and random forest, with feature importance | 3 | 2 (Wed 18) | Valid MAE in RUN_LOG; importance plot saved |
-| P8 | Model: gradient boosting (XGBoost, LightGBM), tuned on a sample of train | 3 | 2 (Wed 18) | Best settings and valid MAE in RUN_LOG; gain over the gate baseline on valid |
-| P9 | Model: KNN comparable bonds, scaling and the choice of k | 4 | 1 (Tue 17) | Error against k plotted; valid MAE in RUN_LOG |
-| P10 | Model: bagged KNN and the "company never seen before" test | 4 | 2 (Wed 18) | Issuer-grouped folds result in RUN_LOG, next to the time-ordered one |
-| P11 | Model: Naive Bayes on `widens_25bp` | 5 | 2 (Thu 19) | Recall, precision and AUC on valid in RUN_LOG |
-| P12 | Model: Naive Bayes against the other classifiers (tree, forest, KNN) | 5 | 2 (Thu 19) | One comparison table and the annex section drafted |
-| P13 | Decision: choose the best model on valid, with settings frozen on Thu 19 | 1 | 3 (Fri 20) | Choice and reasons in RUN_LOG before test is opened |
-| P14 | Notebook: `99_final`, refit, score test once, `gate_report` and the headline table | 1 | 3 (Fri 20) | Runs top to bottom from the panel; gate verdict with 95% intervals |
-| P15 | Docs: the 4-page report for the head of pricing | 6 | 3 (Sat 21) | Numbers only from `99_final`; a teammate has reviewed it |
-| P16 | Docs: technical annex assembled from RUN_LOG and each owner's part | 6 | 3 (Sat 21) | Every model and every run in RUN_LOG covered, gate change stated |
+| P1 | Decision: agree roles, the IG/HY strata and the quality gate on the kickoff call | 1 | 0 (Wed 18) | Owners filled in above; decisions written here |
+| P2 | Setup: scaffold, shared `ml2` package, config and CI on `dev` | 1 | 0 (Wed 18) | PRs #1 and #2 merged; `pytest` and `flake8` pass in CI |
+| P3 | Data: group database, read-only logins and the parquet fallback | 1 | 0 (Wed 18) | Everyone runs `00_data_access` and sees the row counts by partition |
+| P4 | Notebook: `01_eda`, the target, gaps, correlations and the IG/HY definition | 2 | 1 (Thu 19) | Figures in `reports/figures/`; the strata decision posted to the team |
+| P5 | Notebook: `02_baseline_matrix_pricing`, the three baselines on valid | 2 | 1 (Thu 19) | Valid MAE for IG, HY and all in RUN_LOG; slide 7 figure saved |
+| P6 | Model: regression tree with cost-complexity pruning | 3 | 1 (Thu 19) | Best alpha from time-ordered folds; valid MAE in RUN_LOG |
+| P7 | Model: bagging and random forest, with feature importance | 3 | 2 (Fri 20) | Valid MAE in RUN_LOG; importance plot saved |
+| P8 | Model: gradient boosting (XGBoost, LightGBM), tuned on a sample of train | 3 | 2 (Fri 20) | Best settings and valid MAE in RUN_LOG; gain over the gate baseline on valid |
+| P9 | Model: KNN comparable bonds, scaling and the choice of k | 4 | 1 (Thu 19) | Error against k plotted; valid MAE in RUN_LOG |
+| P10 | Model: bagged KNN and the "company never seen before" test | 4 | 2 (Fri 20) | Issuer-grouped folds result in RUN_LOG, next to the time-ordered one |
+| P11 | Model: Naive Bayes on `widens_25bp` | 5 | 2 (Fri 20) | Recall, precision and AUC on valid in RUN_LOG |
+| P12 | Model: Naive Bayes against the other classifiers (tree, forest, KNN) | 5 | 2 (Fri 20) | One comparison table and the annex section drafted |
+| P13 | Decision: choose the best model on valid, with settings frozen on Fri 20 | 1 | 3 (Sat 21) | Choice and reasons in RUN_LOG before test is opened |
+| P14 | Notebook: `99_final`, refit, score test once, `gate_report` and the headline table | 1 | 3 (Sat 21) | Runs top to bottom from the panel; gate verdict with 95% intervals |
+| P15 | Docs: the 4-page report for the head of pricing | 6 | 3 (Sun 22) | Numbers only from `99_final`; a teammate has reviewed it |
+| P16 | Docs: technical annex assembled from RUN_LOG and each owner's part | 6 | 3 (Sun 22) | Every model and every run in RUN_LOG covered, gate change stated |
 | P17 | Docs: final deck and dry run | 6 | 3 (Sun 22) | Every member presents what they built, within 12 minutes |
 | P18 | Release: submission zip (report, annex, database with data dictionary, notebook, deck) | 1 | 3 (Sun 22) | Zip checked against the brief's five items and uploaded before 23:59 |
 
@@ -176,13 +176,11 @@ real numbers. Every issue closes through a pull request into `dev`, reviewed by 
 
 | Day | Work | Output | Issues |
 |---|---|---|---|
-| Mon 16 | Repo and data ready, roles agreed, everyone set up | Logins sent, environment working | P1 to P3 |
-| Tue 17 | EDA and matrix-pricing baseline; others set up and start on train/valid | `01_eda`, `02_baseline` | P4 to P6, P9 |
-| Wed 18 | Trees, ensembles, KNN | Validation results in the run log | P7, P8, P10 |
-| Thu 19 | Classification annex; model choices frozen | Validation results in the run log | P11, P12 |
-| Fri 20 | Choose the best model on validation, then open the test partition **once**. Interpretation | Final results table | P13, P14 |
-| Sat 21 | Report (4 pages), technical annex, deck | Drafts | P15, P16 |
-| Sun 22 | Dry run, fixes, zip, submit before 23:59 | Submission | P17, P18 |
+| Wed 18 | Project chosen, roles agreed, everyone set up with data access; EDA starts | Logins or parquet sent, environment working | P1 to P3 |
+| Thu 19 | EDA and baselines (the baseline code is ready); first tree and KNN runs. Light day: ML Ops presentation | `01_eda`, `02_baseline`, first runs in the log | P4 to P6, P9 |
+| Fri 20 | Ensembles, bagged KNN and the new-company test, Naive Bayes annex; model settings frozen by the evening | Validation results in the run log | P7, P8, P10 to P12 |
+| Sat 21 | Morning: choose the best model on validation, then open the test partition **once**. Afternoon: report, annex and deck drafts | Final results table, drafts | P13, P14 |
+| Sun 22 | Report, annex and deck finished; dry run, zip, submit before 23:59 | Submission | P15 to P18 |
 
 ## 11. Known limits (say them in the report, briefly)
 
