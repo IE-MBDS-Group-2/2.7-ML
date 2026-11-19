@@ -56,3 +56,23 @@ def test_naive_dd_falls_with_leverage_and_handles_zero_debt():
     )
     assert dd[0] > dd[1]
     assert np.isnan(dd[2])
+
+
+def test_issuer_link_by_code_or_name():
+    from ml2.equity import issuer_link
+
+    bonds = pd.DataFrame(
+        {
+            "issuer_ticker": ["AAA", "BBB", "CCC", "DDD"],
+            "cusip_id": ["111111AA1", "222222AA2", "333333AA3", "444444AA4"],
+            "issuer_nm": ["ALPHA CORP", "BK OF BETA", "GAMMA INC", "DELTA HLDGS"],
+        }
+    )
+    price_entity = pd.Series({"AAA": 1, "BBB": 2, "CCC": 3, "DDD": 4})
+    codes = pd.DataFrame({"c6": ["111111", "333333"], "entity_id": [1, 99]})  # CCC's code points elsewhere
+    names = pd.Series({1: "Something Else Inc", 2: "Beta Bancorp", 3: "Unrelated Co", 4: "Delta Air Lines"})
+    link = issuer_link(bonds, price_entity, codes, names)
+    assert link["AAA"]          # issuer code matches the stock's company
+    assert link["BBB"]          # names share "beta"
+    assert not link["CCC"]      # code points to another company and names differ
+    assert link["DDD"]          # names share "delta"

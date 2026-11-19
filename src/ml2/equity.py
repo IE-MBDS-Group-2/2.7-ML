@@ -5,6 +5,8 @@ Every feature uses only information available on or before the snapshot date.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pandas as pd
 
@@ -95,3 +97,44 @@ def naive_distance_to_default(
         s_v = (e / v) * s_e + (f / v) * s_d
         dd = (np.log(v / f) + (mu - 0.5 * s_v**2) * horizon_years) / (s_v * np.sqrt(horizon_years))
     return np.where(valid, dd, np.nan)
+
+
+EQUITY_COLUMNS = ["vol_20d", "vol_60d", "vol_252d", "ret_252d", "mom_12_1", "beta_252d", "market_cap", "total_debt"]
+_NAME_STOP = {"inc", "corp", "corporation", "company", "the", "holdings", "holding", "group", "ltd", "llc", "plc",
+              "and", "co", "lp", "international", "intl", "trust", "new"}
+
+
+def name_tokens(name: object) -> set[str]:
+    """Distinctive lower-case words of a company name (legal suffixes and fillers removed)."""
+    words = re.findall(r"[a-z0-9]+", str(name).lower().replace("&", ""))
+    return {w for w in words if len(w) >= 2 and w not in _NAME_STOP}
+
+
+def issuer_link(
+    bonds: pd.DataFrame,
+    price_entity: pd.Series,
+    issuer_codes: pd.DataFrame,
+    entity_names: pd.Series,
+) -> pd.Series:
+    """Is the company behind each ticker's stock data confirmed as the issuer of the ticker's bonds?
+
+    The bond master gives each bond one ticker (its latest), and stock data is looked up by that ticker. A ticker
+    is confirmed when at least one of its bonds' issuer codes (first 6 CUSIP characters) belongs to the stock's
+    company, or when the bond issuer name and the stock company's name share a word. Otherwise the stock data may
+    belong to another company, and the caller blanks it.
+
+    bonds:        issuer_ticker, cusip_id, issuer_nm
+    price_entity: ticker -> entity id behind the ticker's prices
+    issuer_codes: c6, entity_id (from equity CUSIPs)
+    entity_names: entity id -> company name
+    Returns a boolean Series indexed by ticker.
+    """
+    b = bonds[["issuer_ticker", "cusip_id", "issuer_nm"]].drop_duplicates()
+    b = b.assign(c6=b["cusip_id"].str[:6], price_entity=b["issuer_ticker"].map(price_entity))
+    codes = b.merge(issuer_codes, on="c6", how="inner")
+    by_code = set(codes.loc[codes["entity_id"] == codes["price_entity"], "issuer_ticker"])
+    company = b["price_entity"].map(entity_names)
+    shared = [bool(name_tokens(n) & name_tokens(c)) if pd.notna(c) else False for n, c in zip(b["issuer_nm"], company)]
+    by_name = set(b.loc[shared, "issuer_ticker"])
+    tickers = pd.Index(sorted(b["issuer_ticker"].dropna().unique()), name="ticker")
+    return pd.Series(tickers.isin(by_code | by_name), index=tickers, name="issuer_confirmed")

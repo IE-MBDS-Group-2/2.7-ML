@@ -100,3 +100,17 @@ select ticker, sector
 from fundamentals.company_profile
 where ticker = any(:tickers)
 """
+
+# Issuer codes: the first 6 characters of each company's equity CUSIPs, to confirm the bond-to-stock link.
+ISSUER_CODES = """
+select distinct left(id_value, 6) as c6, entity_id
+from entities.security_identifiers
+where id_type in ('cusip8', 'cusip9')
+  and entity_id is not null
+"""
+
+COMPANY_NAMES = """
+select entity_id, name
+from entities.companies
+where entity_id = any(:entity_ids)
+"""

@@ -1,4 +1,4 @@
-﻿"""Dagster assets: extract from LDP, build the panel, publish to the group database.
+"""Dagster assets: extract from LDP, build the panel, publish to the group database.
 
     snapshot_dates -> trace_bonds_month_end -> equity_month_end --+
                    -> ust_par_month_end ----------------------------+-> bond_month_panel -> group_database
@@ -15,7 +15,7 @@ from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, ass
 
 from ml2.config import load_config, resolve
 from ml2.curves import TENOR_YEARS
-from ml2.equity import features_at_snapshots, rows_asof
+from ml2.equity import EQUITY_COLUMNS, features_at_snapshots, issuer_link, rows_asof
 from ml2.panel import build_panel, column_dictionary
 from ml2_pipeline import queries
 from ml2_pipeline.resources import PostgresResource
@@ -160,8 +160,17 @@ def equity_month_end(
     # Sector: point-in-time GICS where available, else today's profile
     feats = feats.merge(_sector_asof(ldp, tickers, dates), on=["snapshot_date", "ticker"], how="left")
 
+    # Blank the stock data where its company is not confirmed as the bonds' issuer (by issuer code or name)
+    codes = ldp.read(queries.ISSUER_CODES, {})
+    names = ldp.read(queries.COMPANY_NAMES, {"entity_ids": ent.unique().tolist()})
+    link = issuer_link(trace_bonds_month_end, ent, codes, names.set_index("entity_id")["name"])
+    feats["issuer_confirmed"] = feats["ticker"].map(link).fillna(False).astype(bool)
+    unconfirmed = ~feats["issuer_confirmed"]
+    feats.loc[unconfirmed, EQUITY_COLUMNS + ["sector"]] = np.nan
+    feats.loc[unconfirmed, "sector_is_pit"] = False
+
     keep = ["snapshot_date", "ticker", "vol_20d", "vol_60d", "vol_252d", "ret_252d", "mom_12_1", "beta_252d",
-            "market_cap", "total_debt", "sector", "sector_is_pit"]
+            "market_cap", "total_debt", "sector", "sector_is_pit", "issuer_confirmed"]
     out = feats[keep].reset_index(drop=True)
     context.add_output_metadata(
         {
@@ -171,6 +180,7 @@ def equity_month_end(
             "share_with_market_cap": float(out["market_cap"].notna().mean()),
             "share_with_debt": float(out["total_debt"].notna().mean()),
             "share_with_pit_sector": float(out["sector_is_pit"].fillna(False).mean()),
+            "tickers_unconfirmed": int((~link).sum()),
         }
     )
     return out
@@ -223,6 +233,7 @@ def bond_month_panel(
     """The modelling table. Also written to data/processed/ as parquet with a manifest."""
     cfg = _cfg()
     panel = build_panel(trace_bonds_month_end, ust_par_month_end, macro_month_end, equity_month_end, cfg)
+    unconfirmed = set(equity_month_end.loc[~equity_month_end["issuer_confirmed"], "ticker"])
 
     path = resolve(cfg["paths"]["panel_parquet"])
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -239,6 +250,11 @@ def bond_month_panel(
         "last_snapshot": str(panel["snapshot_date"].max().date()),
         "rows_by_partition": panel["partition"].value_counts().to_dict(),
         "rows_by_grade": panel["grade_bucket"].value_counts().to_dict(),
+        "equity_blanked": {
+            "rule": "stock data blanked where its company is not confirmed as the issuer (issuer code or name)",
+            "issuers": int(panel["issuer_ticker"].isin(unconfirmed).groupby(panel["issuer_ticker"]).any().sum()),
+            "rows": int(panel["issuer_ticker"].isin(unconfirmed).sum()),
+        },
         "parquet": str(cfg["paths"]["panel_parquet"]),
         "sha256": sha,
         "extract_config": cfg["extract"],
