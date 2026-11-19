@@ -38,6 +38,10 @@ The issuer's stock data (equity columns and sector) is left empty where the comp
 cannot be confirmed as the bond's issuer, by its issuer code (first 6 CUSIP characters) or by its name.
 The bond rows stay; the manifest counts them.
 
+The grade (IG or HY) is the TRACE flag from the bond's latest master record. Where that record is newer than all
+the bond's trades (usually written as the bond nears maturity and its ratings are withdrawn), the bond takes the
+majority grade of its company's other bonds instead. The manifest counts these bonds too.
+
 ## Columns
 
 Some columns contain the target or future information and must never be model inputs (list at the end).
