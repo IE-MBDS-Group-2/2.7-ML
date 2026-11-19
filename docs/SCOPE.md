@@ -55,7 +55,8 @@ and balance sheets. You get it as a checksum-verified parquet file from the priv
 - **Size:** about 181,000 bond-months: some 13,800 bonds from about 800 companies over 27 month-ends, about
   6,700 bonds per snapshot. Most rows are flagged investment grade (about 85%). Exact counts are in the data
   dictionary ("Last build").
-- **Licensed data:** it stays in the group and in the submission zip. Never commit it or share it.
+- **Licensed data:** it stays in the group and in the submission zip (sharing it with the professor confirmed on
+  19 Nov). Never commit it or share it with anyone else.
 
 ## 5. Target and features
 

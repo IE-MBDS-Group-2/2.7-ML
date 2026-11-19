@@ -5,13 +5,17 @@ The lab. One owner per notebook; shared code goes in `src/ml2`, not copied betwe
 | Notebook | Content | Owner |
 |---|---|---|
 | `00_data_access.ipynb` | Check your parquet copy, load the panel, first look | Miguel |
-| `01_eda.ipynb` | Exploratory analysis: spreads by grade, maturity, sector; missing values; outliers | |
-| `02_baseline_matrix_pricing.ipynb` | Baselines from `ml2.baseline`: matrix pricing re-marked each date (the bar to beat), frozen matrix and median for reference | |
-| `03_trees_ensembles.ipynb` | Regression tree, bagging, random forest, gradient boosting | |
-| `04_knn_comparables.ipynb` | KNN "comparable bonds" pricing | |
+| `01_eda.ipynb` | Exploratory analysis: spreads by grade, maturity, sector; missing values; outliers | Role 2 |
+| `02_baseline_matrix_pricing.ipynb` | Baselines from `ml2.baseline`: matrix pricing re-marked each date (the bar to beat), frozen matrix and median for reference | Role 2 |
+| `03_trees_ensembles.ipynb` | Regression tree, bagging, random forest, gradient boosting | Role 3 |
+| `04_knn_comparables.ipynb` | KNN "comparable bonds" pricing | Role 4 |
 | `05_neural_network.ipynb` | On standby: MLP regressor, only once its class notebook is released | |
-| `06_annex_classification.ipynb` | `widens_25bp`: Naive Bayes and every classifier | |
-| `99_final.ipynb` | The final notebook for the submission: runs top to bottom from the panel, scores test once and runs the quality gate (`gate_report` against matrix pricing re-marked each date). `OPEN_TEST = False` dry-runs it on valid; `True` opens test once and locks it to one model (`ml2.final`) | |
+| `06_annex_classification.ipynb` | `widens_25bp`: Naive Bayes and every classifier | Role 5 |
+| `99_final.ipynb` | The final notebook for the submission: runs top to bottom from the panel, scores test once and runs the quality gate (`gate_report` against matrix pricing re-marked each date). `OPEN_TEST = False` dry-runs it on valid; `True` opens test once and locks it to one model (`ml2.final`) | Miguel |
+
+01 to 04 and 06 are starters: the setup cell runs as it is (panel check, train and valid, the 30% search
+sample and time-ordered folds; in 03 and 04 also the gate baseline on valid and `vs_bar()` to compare with it),
+then one heading and one empty cell per step. Fill them in following the class notebook for the method.
 
 Rules: import splits and metrics from `ml2`, never split randomly, do not touch `partition == "test"`
 until the final table, and add a line to `RUN_LOG.md` for every model run.
