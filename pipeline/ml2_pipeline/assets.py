@@ -1,6 +1,6 @@
 """Dagster assets: extract from LDP, build the panel, publish to the group database.
 
-    snapshot_dates -> trace_bonds_month_end -> equity_month_end --+
+    snapshot_dates -> trace_bonds_month_end -> issuer_resolution -> equity_month_end --+
                    -> ust_par_month_end ----------------------------+-> bond_month_panel -> group_database
                    -> macro_month_end ------------------------------+
 """
@@ -15,7 +15,16 @@ from dagster import AssetExecutionContext, MaterializeResult, MetadataValue, ass
 
 from ml2.config import load_config, resolve
 from ml2.curves import TENOR_YEARS
-from ml2.equity import EQUITY_COLUMNS, features_at_snapshots, issuer_link, rows_asof
+from ml2.equity import (
+    EQUITY_COLUMNS,
+    SECTOR_TO_GICS,
+    features_at_snapshots,
+    issuer_keys,
+    issuer_link,
+    resolve_issuers,
+    rows_asof,
+    share_count_jumps,
+)
 from ml2.panel import build_panel, column_dictionary
 from ml2_pipeline import queries
 from ml2_pipeline.resources import PostgresResource
@@ -51,7 +60,8 @@ def snapshot_dates(context: AssetExecutionContext, ldp: PostgresResource) -> pd.
     ex = _cfg()["extract"]
     df = ldp.read(
         queries.SNAPSHOT_DATES,
-        {"start": ex["start_date"], "end": ex["end_date"], "min_bonds": ex["min_bonds_per_snapshot_day"]},
+        {"start": ex["start_date"], "end": ex["end_date"], "min_bonds": ex["min_bonds_per_snapshot_day"],
+         "min_share": ex["min_share_of_month_median_day"]},
     )
     context.add_output_metadata({"n_snapshots": len(df), "first": str(df.iloc[0, 0]), "last": str(df.iloc[-1, 0])})
     return df
@@ -110,83 +120,163 @@ def macro_month_end(
 
 
 @asset(group_name="extract", compute_kind="sql")
-def equity_month_end(
+def issuer_resolution(
     context: AssetExecutionContext,
     ldp: PostgresResource,
     snapshot_dates: pd.DataFrame,
     trace_bonds_month_end: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Issuer equity features, market cap, debt and sector as of each snapshot date."""
+    """Which listed company each bond-month's stock data comes from (ticker match, or the issuer-code map)."""
+    dates = _dates(snapshot_dates)
+    bonds = trace_bonds_month_end
+    tmap = ldp.read(queries.TICKER_MAP, {"c6": sorted(set(bonds["cusip_id"].str[:6]))})
+    tickers = sorted(set(bonds["issuer_ticker"].dropna()) | set(tmap["ticker"].dropna()))
+    start = (dates.min() - pd.Timedelta(days=10)).date()
+    px = ldp.read(queries.PRICES, {"start": start, "end": dates.max().date(), "tickers": tickers})
+    res = resolve_issuers(bonds, px, tmap)
+    res["issuer_key"] = issuer_keys(res)
+    moved = (res["source"] == "map") & (res["map_entity"] != res["ticker_entity"])
+    context.add_output_metadata(
+        {
+            "rows": len(res),
+            "rows_by_source": MetadataValue.json(res["source"].value_counts().to_dict()),
+            "rows_moved_to_another_company": int(moved.sum()),
+            "rows_without_listed_company": int(res["entity_id"].isna().sum()),
+            "keys_with_entity_suffix": int(res["issuer_key"].str.contains(".", regex=False).sum()),
+        }
+    )
+    return res
+
+
+@asset(group_name="extract", compute_kind="sql")
+def equity_month_end(
+    context: AssetExecutionContext,
+    ldp: PostgresResource,
+    snapshot_dates: pd.DataFrame,
+    trace_bonds_month_end: pd.DataFrame,
+    issuer_resolution: pd.DataFrame,
+) -> pd.DataFrame:
+    """Issuer equity features, market cap, debt and sector per company key and snapshot date.
+
+    Everything is computed per listed company (LDP entity), so a ticker reused by another company never mixes
+    two price histories; the result is keyed by issuer_key, the panel's issuer_ticker.
+    """
     ex = _cfg()["extract"]
     dates = _dates(snapshot_dates)
     market = ex["market_ticker"]
-    tickers = sorted(set(trace_bonds_month_end["issuer_ticker"].dropna()) | {market})
+    res = issuer_resolution.dropna(subset=["entity_id"]).copy()
+    res["entity_id"] = res["entity_id"].astype("int64")
+    entities = [int(e) for e in sorted(res["entity_id"].unique())]
+    tickers = sorted(set(res["equity_ticker"].dropna()) | set(res["issuer_ticker"].dropna()) | {market})
 
     px = ldp.read(queries.PRICES, {"start": ex["equity_history_start"], "end": dates.max().date(), "tickers": tickers})
     px["date"] = pd.to_datetime(px["date"])
-    adj = px.pivot_table(index="date", columns="ticker", values="adj_close", aggfunc="last").sort_index()
-    raw_close = px.pivot_table(index="date", columns="ticker", values="raw_close", aggfunc="last").sort_index()
+    mkt = px[px["ticker"] == market].groupby("date")["adj_close"].last()
+    px = px.dropna(subset=["entity_id"])
+    px["entity_id"] = px["entity_id"].astype("int64")
+    px = px[px["entity_id"].isin(entities)]
+    # One listing per company and day: a company with two listings (ADR and ordinary shares, two share classes)
+    # would otherwise flip between their price levels. Keep the listing with the longest price history.
+    n_rows = px.groupby(["entity_id", "ticker"])["date"].transform("size")
+    px = px.assign(n_rows=n_rows).sort_values(["date", "entity_id", "n_rows", "ticker"])
+    px = px.drop_duplicates(["date", "entity_id"], keep="last").drop(columns="n_rows")
+    adj = px.pivot_table(index="date", columns="entity_id", values="adj_close", aggfunc="last").sort_index()
+    raw_close = px.pivot_table(index="date", columns="entity_id", values="raw_close", aggfunc="last").sort_index()
+    adj.columns = adj.columns.astype(str)
+    raw_close.columns = raw_close.columns.astype(str)
+    adj["__market__"] = mkt.reindex(adj.index)
 
-    feats = features_at_snapshots(adj, dates, market)
-    close_snap = rows_asof(raw_close, dates).rename_axis("snapshot_date")
-    close_long = close_snap.stack(future_stack=True).rename("close_unadj").reset_index()
-    close_long.columns = ["snapshot_date", "ticker", "close_unadj"]
-    feats = feats.merge(close_long, on=["snapshot_date", "ticker"], how="left")
-    feats = feats[feats["ticker"] != market]
+    feats = features_at_snapshots(adj, dates, "__market__").rename(columns={"ticker": "entity"})
+    feats = feats[feats["entity"] != "__market__"]
 
-    # Shares outstanding (by entity id), as of the snapshot, at most N days stale
-    ent = px.dropna(subset=["entity_id"]).sort_values("date").groupby("ticker")["entity_id"].last().astype("int64")
+    def at_snapshots(wide: pd.DataFrame, name: str) -> pd.DataFrame:
+        snap = rows_asof(wide, dates).rename_axis("snapshot_date")
+        long = snap.stack(future_stack=True).rename(name).reset_index()
+        long.columns = ["snapshot_date", "entity", name]
+        return long
+
+    feats = feats.merge(at_snapshots(raw_close, "close_unadj"), on=["snapshot_date", "entity"], how="left")
+    feats = feats.merge(at_snapshots(adj.drop(columns="__market__"), "adj_close"), on=["snapshot_date", "entity"],
+                        how="left")
+    feats["entity_id"] = feats["entity"].astype("int64")
+
+    # Shares outstanding by company, as of the snapshot, at most N days stale
     shares = ldp.read(
-        queries.SHARES,
-        {"entity_ids": ent.unique().tolist(), "start": (pd.Timestamp(ex["equity_history_start"])).date()},
+        queries.SHARES, {"entity_ids": entities, "start": pd.Timestamp(ex["equity_history_start"]).date()}
     )
     shares["date"] = pd.to_datetime(shares["date"])
-    shares = shares.merge(ent.rename("entity_id").reset_index(), on="entity_id")
-    feats = _merge_asof_by_ticker(
-        feats, shares[["ticker", "date", "shares_outstanding"]], "date", ex["shares_max_staleness_days"]
-    )
+    feats = _merge_asof_by(feats, shares[["entity_id", "date", "shares_outstanding"]], "entity_id", "date",
+                           ex["shares_max_staleness_days"])
     feats["market_cap"] = feats["close_unadj"] * feats["shares_outstanding"]
+    jumps = share_count_jumps(feats[["entity_id", "snapshot_date", "market_cap", "adj_close"]],
+                              factor=ex["share_jump_factor"])
+    feats.loc[jumps, "market_cap"] = np.nan
 
-    # Total debt from the latest quarterly balance sheet already filed
-    bs = ldp.read(queries.BALANCE_SHEET, {"tickers": tickers, "start": "2022-01-01"})
+    # Total debt from the latest quarterly balance sheet already filed, reported in USD only
+    bs = ldp.read(queries.BALANCE_SHEET, {"tickers": tickers, "entity_ids": entities, "start": "2022-01-01"})
+    ticker_entity = res.groupby("equity_ticker")["entity_id"].agg(lambda s: s.value_counts().index[0])
+    bs["entity_id"] = bs["entity_id"].fillna(bs["ticker"].map(ticker_entity))
+    other_ccy = bs["currency"].notna() & (bs["currency"] != ex["debt_currency"])
+    n_other_ccy = int(other_ccy.sum())
+    bs = bs[~other_ccy & bs["entity_id"].notna()].copy()
+    bs["entity_id"] = bs["entity_id"].astype("int64")
     bs["period_end"] = pd.to_datetime(bs["period_end"])
     bs["filing_date"] = pd.to_datetime(bs["filing_date"])
     lag = pd.Timedelta(days=ex["filing_lag_days_if_missing"])
     bs["available_date"] = bs["filing_date"].fillna(bs["period_end"] + lag)
-    bs = bs.dropna(subset=["total_debt"]).sort_values(["ticker", "available_date", "period_end"])
-    bs = bs.drop_duplicates(["ticker", "available_date"], keep="last")
-    feats = _merge_asof_by_ticker(feats, bs[["ticker", "available_date", "total_debt"]], "available_date", 400)
+    # The newest period known on each date: an old period filed late never replaces a newer one
+    bs = bs.dropna(subset=["total_debt"]).sort_values(["entity_id", "available_date", "period_end"])
+    bs["newest_period"] = bs.groupby("entity_id")["period_end"].cummax()
+    bs = bs[bs["period_end"] == bs["newest_period"]]
+    bs = bs.drop_duplicates(["entity_id", "available_date"], keep="last")
+    feats = _merge_asof_by(feats, bs[["entity_id", "available_date", "total_debt"]], "entity_id",
+                           "available_date", 400)
 
-    # Sector: point-in-time GICS where available, else today's profile
-    feats = feats.merge(_sector_asof(ldp, tickers, dates), on=["snapshot_date", "ticker"], how="left")
+    # From company to issuer key (one key per company), then sector by the key's ticker on each date
+    keys = res.groupby(["snapshot_date", "issuer_key"]).agg(
+        entity_id=("entity_id", "first"), equity_ticker=("equity_ticker", "first"),
+        via_map=("source", lambda s: bool((s == "map").any()))).reset_index()
+    keys["snapshot_date"] = pd.to_datetime(keys["snapshot_date"])
+    out = keys.merge(feats.drop(columns=["entity"]), on=["snapshot_date", "entity_id"], how="left")
+    sector = _sector_asof(ldp, sorted(set(keys["equity_ticker"].dropna())), dates)
+    out = out.merge(sector.rename(columns={"ticker": "equity_ticker"}), on=["snapshot_date", "equity_ticker"],
+                    how="left")
 
-    # Blank the stock data where its company is not confirmed as the bonds' issuer (by issuer code or name)
+    # Blank the stock data where its company is not confirmed as the bonds' issuer. Bond-months matched through
+    # the issuer-code map are confirmed by construction; the rest need the issuer code or a distinctive name word.
     codes = ldp.read(queries.ISSUER_CODES, {})
-    names = ldp.read(queries.COMPANY_NAMES, {"entity_ids": ent.unique().tolist()})
-    link = issuer_link(trace_bonds_month_end, ent, codes, names.set_index("entity_id")["name"])
-    feats["issuer_confirmed"] = feats["ticker"].map(link).fillna(False).astype(bool)
-    unconfirmed = ~feats["issuer_confirmed"]
-    feats.loc[unconfirmed, EQUITY_COLUMNS + ["sector"]] = np.nan
-    feats.loc[unconfirmed, "sector_is_pit"] = False
+    names = ldp.read(queries.COMPANY_NAMES, {"entity_ids": entities})
+    bonds_k = trace_bonds_month_end.assign(snapshot_date=pd.to_datetime(trace_bonds_month_end["snapshot_date"])).merge(
+        issuer_resolution[["snapshot_date", "cusip_id", "issuer_key"]], on=["snapshot_date", "cusip_id"])
+    bonds_k = bonds_k.assign(issuer_ticker=bonds_k["issuer_key"])
+    key_entity = res.groupby("issuer_key")["entity_id"].first()
+    link = issuer_link(bonds_k, key_entity, codes, names.set_index("entity_id")["name"])
+    via_map = set(keys.loc[keys["via_map"], "issuer_key"])
+    out["issuer_confirmed"] = out["issuer_key"].map(link).fillna(False).astype(bool) | out["issuer_key"].isin(via_map)
+    unconfirmed = ~out["issuer_confirmed"]
+    out.loc[unconfirmed, EQUITY_COLUMNS + ["sector"]] = np.nan
+    out.loc[unconfirmed, "sector_is_pit"] = False
 
+    out = out.rename(columns={"issuer_key": "ticker"})
     keep = ["snapshot_date", "ticker", "vol_20d", "vol_60d", "vol_252d", "ret_252d", "mom_12_1", "beta_252d",
             "market_cap", "total_debt", "sector", "sector_is_pit", "issuer_confirmed"]
-    out = feats[keep].reset_index(drop=True)
+    out = out[keep].reset_index(drop=True)
     context.add_output_metadata(
         {
             "rows": len(out),
-            "tickers_requested": len(tickers) - 1,
-            "tickers_with_prices": int(out.dropna(subset=["vol_60d"])["ticker"].nunique()),
+            "companies": len(entities),
             "share_with_market_cap": float(out["market_cap"].notna().mean()),
+            "market_cap_blanked_share_jumps": int(jumps.sum()),
             "share_with_debt": float(out["total_debt"].notna().mean()),
+            "debt_filings_other_currency_dropped": n_other_ccy,
             "share_with_pit_sector": float(out["sector_is_pit"].fillna(False).mean()),
-            "tickers_unconfirmed": int((~link).sum()),
+            "keys_unconfirmed": int((~out.drop_duplicates("ticker")["issuer_confirmed"]).sum()),
         }
     )
     return out
 
 
-def _merge_asof_by_ticker(left: pd.DataFrame, right: pd.DataFrame, right_on: str, max_days: int) -> pd.DataFrame:
+def _merge_asof_by(left: pd.DataFrame, right: pd.DataFrame, by: str, right_on: str, max_days: int) -> pd.DataFrame:
     left = left.sort_values("snapshot_date")
     right = right.dropna(subset=[right_on]).sort_values(right_on)
     return pd.merge_asof(
@@ -194,7 +284,7 @@ def _merge_asof_by_ticker(left: pd.DataFrame, right: pd.DataFrame, right_on: str
         right,
         left_on="snapshot_date",
         right_on=right_on,
-        by="ticker",
+        by=by,
         direction="backward",
         tolerance=pd.Timedelta(days=max_days),
     ).drop(columns=[right_on])
@@ -217,7 +307,7 @@ def _sector_asof(ldp: PostgresResource, tickers: list[str], dates: pd.DatetimeIn
     out = grid.merge(pit, on=["snapshot_date", "ticker"], how="left")
     fallback = prof.drop_duplicates("ticker").set_index("ticker")["sector"]
     missing = out["sector"].isna()
-    out.loc[missing, "sector"] = out.loc[missing, "ticker"].map(fallback)
+    out.loc[missing, "sector"] = out.loc[missing, "ticker"].map(fallback).replace(SECTOR_TO_GICS)
     out.loc[missing, "sector_is_pit"] = False
     return out
 
@@ -226,13 +316,22 @@ def _sector_asof(ldp: PostgresResource, tickers: list[str], dates: pd.DatetimeIn
 def bond_month_panel(
     context: AssetExecutionContext,
     trace_bonds_month_end: pd.DataFrame,
+    issuer_resolution: pd.DataFrame,
     ust_par_month_end: pd.DataFrame,
     macro_month_end: pd.DataFrame,
     equity_month_end: pd.DataFrame,
 ) -> pd.DataFrame:
     """The modelling table. Also written to data/processed/ as parquet with a manifest."""
     cfg = _cfg()
-    panel = build_panel(trace_bonds_month_end, ust_par_month_end, macro_month_end, equity_month_end, cfg)
+    bonds = trace_bonds_month_end.assign(snapshot_date=pd.to_datetime(trace_bonds_month_end["snapshot_date"])).merge(
+        issuer_resolution[["snapshot_date", "cusip_id", "issuer_key", "source", "ticker_entity", "map_entity"]],
+        on=["snapshot_date", "cusip_id"], how="left")
+    moved = (bonds["source"] == "map") & (bonds["map_entity"] != bonds["ticker_entity"])
+    bonds["issuer_ticker"] = bonds["issuer_key"].fillna(bonds["issuer_ticker"])
+    panel = build_panel(bonds, ust_par_month_end, macro_month_end, equity_month_end, cfg)
+    moved_keys = bonds.loc[moved, ["snapshot_date", "cusip_id"]].assign(moved=True)
+    moved_keys["snapshot_date"] = pd.to_datetime(moved_keys["snapshot_date"])
+    panel_moved = panel[["snapshot_date", "cusip_id"]].merge(moved_keys, how="left")["moved"].fillna(False)
     unconfirmed = set(equity_month_end.loc[~equity_month_end["issuer_confirmed"], "ticker"])
 
     path = resolve(cfg["paths"]["panel_parquet"])
@@ -255,6 +354,11 @@ def bond_month_panel(
             "rule": "stock data blanked where its company is not confirmed as the issuer (issuer code or name)",
             "issuers": int(panel["issuer_ticker"].isin(unconfirmed).groupby(panel["issuer_ticker"]).any().sum()),
             "rows": int(panel["issuer_ticker"].isin(unconfirmed).sum()),
+        },
+        "issuer_from_code_map": {
+            "rule": "the issuer-code map's company when unique, not ambiguous and listed on the date; else the ticker",
+            "rows_moved_to_another_company": int(panel_moved.sum()),
+            "issuers_moved": int(panel.loc[panel_moved.to_numpy(), "issuer_ticker"].nunique()),
         },
         "grade_from_issuer": {
             "rule": "bonds whose master record is newer than all their trades take their company's majority grade",

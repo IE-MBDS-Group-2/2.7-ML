@@ -76,3 +76,80 @@ def test_issuer_link_by_code_or_name():
     assert link["BBB"]          # names share "beta"
     assert not link["CCC"]      # code points to another company and names differ
     assert link["DDD"]          # names share "delta"
+
+
+def test_resolve_issuers_uses_the_code_map_only_when_safe():
+    from ml2.equity import resolve_issuers
+
+    d = pd.Timestamp("2025-01-31")
+    bonds = pd.DataFrame({
+        "snapshot_date": [d, d, d, d],
+        "cusip_id": ["111111AA1", "222222AA2", "333333AA3", "444444AA4"],
+        "issuer_ticker": ["PAR", "PAR", "OLD", "XYZ"],
+    })
+    prices = pd.DataFrame({
+        "date": [d, d, d, d],
+        "ticker": ["PAR", "SUB", "OLD", "XYZ"],
+        "entity_id": [1, 2, 3, 4],
+    })
+    tmap = pd.DataFrame({
+        "issuer_cusip6": ["222222", "333333", "333333", "444444"],
+        "entity_id": [2, 7, 8, 4],
+        "cusip6_valid_from": [None] * 4, "cusip6_valid_to": [None] * 4,
+        "cusip6_ambiguous": [False, False, False, False],
+        "ticker": ["SUB", "OLD", "NEW", "XYZ"],
+        "valid_from": [None] * 4, "valid_to": [None] * 4,
+        "ticker_precedence": [1, 1, 1, 1],
+    })
+    r = resolve_issuers(bonds, prices, tmap).set_index("cusip_id")
+    assert r.loc["111111AA1", "source"] == "ticker" and r.loc["111111AA1", "entity_id"] == 1  # no map row
+    assert r.loc["222222AA2", "source"] == "map" and r.loc["222222AA2", "entity_id"] == 2      # listed subsidiary
+    assert r.loc["222222AA2", "equity_ticker"] == "SUB"
+    assert r.loc["333333AA3", "source"] == "ticker" and r.loc["333333AA3", "entity_id"] == 3   # two companies
+    assert r.loc["444444AA4", "source"] == "map" and r.loc["444444AA4", "entity_id"] == 4
+
+
+def test_resolve_issuers_needs_a_listed_price_on_the_date():
+    from ml2.equity import resolve_issuers
+
+    d = pd.Timestamp("2025-01-31")
+    bonds = pd.DataFrame({"snapshot_date": [d], "cusip_id": ["222222AA2"], "issuer_ticker": ["PAR"]})
+    prices = pd.DataFrame({"date": [d, d - pd.Timedelta(days=40)], "ticker": ["PAR", "SUB"], "entity_id": [1, 2]})
+    tmap = pd.DataFrame({
+        "issuer_cusip6": ["222222"], "entity_id": [2], "cusip6_valid_from": [None], "cusip6_valid_to": [None],
+        "cusip6_ambiguous": [False], "ticker": ["SUB"], "valid_from": [None], "valid_to": [None],
+        "ticker_precedence": [1],
+    })
+    r = resolve_issuers(bonds, prices, tmap)
+    assert r["source"].item() == "ticker" and r["entity_id"].item() == 1  # SUB stopped trading 40 days ago
+
+
+def test_issuer_keys_split_a_reused_ticker():
+    from ml2.equity import issuer_keys
+
+    res = pd.DataFrame({"equity_ticker": ["ABC", "ABC", "ABC", "XYZ"], "entity_id": [1, 1, 9, None]})
+    assert issuer_keys(res).tolist() == ["ABC", "ABC", "ABC.9", "XYZ"]
+
+
+def test_share_count_jumps_flag_a_spike_not_a_split():
+    from ml2.equity import share_count_jumps
+
+    dates = pd.date_range("2025-01-31", periods=5, freq="ME")
+    frame = pd.DataFrame({
+        "entity_id": [1] * 5 + [2] * 5,
+        "snapshot_date": list(dates) * 2,
+        # company 1: a 10-for-1 split in month 3 (price /10, shares x10): market cap and adjusted price unchanged
+        # company 2: market cap 40x in month 3 only, price unchanged: a wrong share count
+        "market_cap": [100.0, 102, 101, 103, 104, 50, 51, 2000, 52, 53],
+        "adj_close": [10.0, 10.2, 10.1, 10.3, 10.4, 5, 5.1, 5.0, 5.2, 5.3],
+    })
+    flags = share_count_jumps(frame)
+    assert flags.sum() == 1 and frame.loc[flags, "entity_id"].item() == 2
+
+
+def test_generic_words_do_not_confirm_a_company():
+    from ml2.equity import name_tokens
+
+    assert not (name_tokens("BANK OF AMERICA CORP") & name_tokens("Bank of Montreal"))
+    assert not (name_tokens("AMERICAN EXPRESS CO") & name_tokens("American Airlines Group Inc"))
+    assert name_tokens("DELTA AIR LINES INC") & name_tokens("Delta Air Lines, Inc.")

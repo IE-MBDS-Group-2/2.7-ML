@@ -1,18 +1,26 @@
 """SQL against the LDP mart. All read-only."""
 
-# The last day of each month with a normal trading volume. Thin days (e.g. Good Friday,
-# when the bond market is closed but a few trades are still reported) are skipped.
+# The last day of each month with a normal trading volume. Thin days are skipped: Good Friday (bond market
+# closed, a few trades still reported) and half-days such as the Friday after Thanksgiving.
 SNAPSHOT_DATES = """
 with daily as (
     select trade_date, count(*) as n_bonds
     from credit.trace_daily
     where trade_date between :start and :end
     group by trade_date
+),
+monthly as (
+    select date_trunc('month', trade_date) as month,
+           percentile_cont(0.5) within group (order by n_bonds) as median_bonds
+    from daily
+    group by 1
 )
-select max(trade_date) as snapshot_date
-from daily
-where n_bonds >= :min_bonds
-group by date_trunc('month', trade_date)
+select max(d.trade_date) as snapshot_date
+from daily d
+join monthly m on m.month = date_trunc('month', d.trade_date)
+where d.n_bonds >= :min_bonds
+  and d.n_bonds >= :min_share * m.median_bonds
+group by date_trunc('month', d.trade_date)
 order by 1
 """
 
@@ -81,11 +89,20 @@ where entity_id = any(:entity_ids)
 """
 
 BALANCE_SHEET = """
-select ticker, date as period_end, filing_date, total_debt
+select ticker, entity_id, date as period_end, filing_date, total_debt,
+       raw_json::jsonb ->> 'reportedCurrency' as currency
 from fundamentals.balance_sheet
 where period = 'quarter'
-  and ticker = any(:tickers)
+  and (ticker = any(:tickers) or entity_id = any(:entity_ids))
   and date >= cast(:start as date)
+"""
+
+# Issuer code (first 6 CUSIP characters) to listed company, with validity spans (LDP fixed_income views)
+TICKER_MAP = """
+select issuer_cusip6, entity_id, cusip6_valid_from, cusip6_valid_to, cusip6_ambiguous,
+       ticker, valid_from, valid_to, ticker_precedence
+from fixed_income.issuer_ticker_map
+where issuer_cusip6 = any(:c6)
 """
 
 SECTOR_HISTORY = """

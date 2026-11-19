@@ -27,6 +27,18 @@ The grade (IG or HY) is the TRACE flag from the bond's latest master record. Whe
 the bond's trades (usually written as the bond nears maturity and its ratings are withdrawn), the bond takes the
 majority grade of its company's other bonds instead. The manifest counts these bonds too.
 
+The company behind each bond is its ticker's listed company on the snapshot date, unless the issuer-code map (first
+6 CUSIP characters to company) gives exactly one listed company that is not flagged ambiguous: then that company.
+Stock data is computed per company, so a ticker reused by another company never mixes two price histories.
+Debt is taken only from filings reported in US dollars. Market cap is left empty when the share count it implies
+jumps more than 2.5 times against the previous three snapshots (a data error, not a market move). Sector names
+from company profiles are mapped to the GICS names of the sector history.
+
+`widens_25bp` uses the bond's spread on the next snapshot even when that row is not in the table (a spread or yield
+past the bounds above, or no stock data), so the bonds that blow out are not lost from the label. Month-end
+snapshots skip half-days, such as the day after Thanksgiving. `bond_age_years` is not a model input: it is dated
+by the bond's latest master record, which can postdate the trade.
+
 ## Columns
 
 Some columns contain the target or future information and must never be model inputs (list at the end).
@@ -65,7 +77,7 @@ Some columns contain the target or future information and must never be model in
 | `years_to_maturity` | Years until the bond repays its principal |
 | `maturity_bucket` | Maturity bucket: 1-3y, 3-5y, 5-7y, 7-10y, 10-20y, 20y+ |
 | `coupon_pct` | Annual interest the bond pays, percent of face value |
-| `bond_age_years` | Approximate years since the bond was issued |
+| `bond_age_years` | Years since the start of the bond's latest master record, not its issue date. Not a feature: a record rewritten after the bond traded is future information |
 | `grade` | TRACE credit grade flag: I = investment grade, H = high yield (the bond's latest master record, not as of the snapshot) |
 | `grade_bucket` | IG or HY: the two strata for metrics and the quality gate. The TRACE flag, except for bonds whose master record is newer than all their trades: those take the majority grade of their company's other bonds |
 | `is_144a` | True for a privately placed bond (Rule 144A), usually less liquid |
@@ -119,12 +131,12 @@ Some columns contain the target or future information and must never be model in
 | `vix` | VIX: expected volatility of the S&P 500 (market fear gauge) |
 | `sofr_pct` | SOFR: the overnight secured funding rate, percent |
 
-**Not allowed as model inputs:** `snapshot_date`, `cusip_id`, `issuer_ticker`, `issuer_name`, `partition`, `spread_bps`, `yield_pct`, `ust_yield_at_maturity_pct`, `price`, `spread_change_next_bps`, `widens_25bp`, `grade`.
+**Not allowed as model inputs:** `snapshot_date`, `cusip_id`, `issuer_ticker`, `issuer_name`, `partition`, `spread_bps`, `yield_pct`, `ust_yield_at_maturity_pct`, `price`, `spread_change_next_bps`, `widens_25bp`, `grade`, `bond_age_years`.
 
 ## Last build
 
-- Built (UTC): 2026-11-19T13:23:49+00:00
-- Rows: 181,113; bonds: 13,763; issuers: 804; snapshots: 27 (2024-01-31 to 2026-03-17)
-- Rows by partition: {'train': 114179, 'valid': 27689, 'test': 26464, 'gap': 12781}
-- Rows by grade: {'IG': 166015, 'HY': 15098}
-- Parquet sha256: `92d3aeb8cdc98d851a2d4963e3beeab154b86750bd4b5bb5a4854870d23e7553`
+- Built (UTC): 2026-11-19T16:26:44+00:00
+- Rows: 189,982; bonds: 14,275; issuers: 881; snapshots: 27 (2024-01-31 to 2026-03-17)
+- Rows by partition: {'train': 119456, 'valid': 28569, 'test': 27775, 'gap': 14182}
+- Rows by grade: {'IG': 174789, 'HY': 15193}
+- Parquet sha256: `d817a09a6ec8990aba003bb82badc79e989a82736f9a3aaac37011f7409a7835`

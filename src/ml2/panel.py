@@ -60,6 +60,19 @@ def build_panel(
 
     # --- target ---------------------------------------------------------------
     df["years_to_maturity"] = (df["mtrty_dt"] - df["snapshot_date"]).dt.days / 365.25
+
+    # Every reported spread before the row filters. The annex label needs next month's spread even when that row is
+    # dropped below (a spread past the bound, a yield past the bound, no stock data): those are the bonds that blew
+    # out, so dropping them would hide most of the widenings.
+    raw = df[(df["years_to_maturity"] > 0) & (df["vw_yield"] > 0)]
+    next_spread = pd.DataFrame({
+        "cusip_id": raw["cusip_id"],
+        "snapshot_date": raw["snapshot_date"],
+        "spread_next_bps": (raw["vw_yield"].astype(float)
+                            - treasury_at_maturity(curves, raw["snapshot_date"], raw["years_to_maturity"])) * 100,
+    })
+    snaps = np.sort(df["snapshot_date"].unique())
+
     df = df[df["years_to_maturity"].between(ex["min_years_to_maturity"], ex["max_years_to_maturity"])]
     y_lo, y_hi = ex["yield_bounds_pct"]
     df = df[(df["vw_yield"] > y_lo) & (df["vw_yield"] < y_hi)].copy()
@@ -119,12 +132,10 @@ def build_panel(
     df["grade_bucket"] = issuer_consistent_grade(df)
 
     # --- annex label: does the spread widen by the next month-end? ------------
-    snaps = np.sort(df["snapshot_date"].unique())
     snap_idx = {d: i for i, d in enumerate(snaps)}
     df["snap_idx"] = df["snapshot_date"].map(snap_idx)
-    nxt = df[["cusip_id", "snap_idx", "spread_bps"]].copy()
-    nxt["snap_idx"] -= 1
-    nxt = nxt.rename(columns={"spread_bps": "spread_next_bps"})
+    nxt = next_spread.assign(snap_idx=next_spread["snapshot_date"].map(snap_idx) - 1)
+    nxt = nxt[["cusip_id", "snap_idx", "spread_next_bps"]].drop_duplicates(["cusip_id", "snap_idx"])
     df = df.merge(nxt, on=["cusip_id", "snap_idx"], how="left")
     df["spread_change_next_bps"] = df["spread_next_bps"] - df["spread_bps"]
     widens = (df["spread_change_next_bps"] >= pr["widen_threshold_bps"]).astype("Int8")

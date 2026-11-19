@@ -11,6 +11,7 @@ extract:
   end_date: "2026-03-31"              # TRACE Enhanced ends 2026-03-17
   equity_history_start: "2023-01-01"  # one year of prices before the first snapshot
   min_bonds_per_snapshot_day: 2000    # a normal day has about 11k bonds; skips holidays like Good Friday
+  min_share_of_month_median_day: 0.9  # also skips half-days (about 80% of a normal day's bonds)
   coupon_type: FXPV                   # fixed-rate plain-vanilla coupons only
   min_years_to_maturity: 1.0
   max_years_to_maturity: 30.5
@@ -18,7 +19,9 @@ extract:
   spread_bounds_bps: [-100, 3000]     # drop bad prints and deeply distressed bonds
   market_ticker: SPY                  # for beta
   shares_max_staleness_days: 130
-  filing_lag_days_if_missing: 45      # balance sheet known 45 days after period end when no filing date
+  filing_lag_days_if_missing: 90      # balance sheet known 90 days after period end when no filing date
+  debt_currency: USD                  # debt from filings in other currencies is left empty (no FX conversion)
+  share_jump_factor: 2.5              # market cap left empty when the implied share count jumps this much
 
 problem:
   target: spread_bps               # regression target (main report)

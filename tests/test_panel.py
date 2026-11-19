@@ -88,3 +88,12 @@ def test_grade_from_a_later_master_record_follows_the_company():
     panel = build_panel(bonds, curves, macro, equity, load_config())
     b2 = panel.loc[panel.cusip_id == "B2"].iloc[0]
     assert b2["grade"] == "H" and b2["grade_bucket"] == "IG"
+
+
+def test_label_uses_next_spread_even_when_that_row_is_filtered_out():
+    bonds, curves, macro, equity = _inputs()
+    bonds.loc[1, "vw_yield"] = 45.0  # B1 blows out in February: the row is dropped by the yield bound
+    panel = build_panel(bonds, curves, macro, equity, load_config())
+    b1 = panel[panel.cusip_id == "B1"]
+    assert len(b1) == 1  # only January is left
+    assert b1["widens_25bp"].item() == 1  # but January still knows it widened
