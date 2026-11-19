@@ -76,3 +76,16 @@ def test_next_month_widening_label():
 def test_partition_assigned():
     panel = build_panel(*_inputs(), load_config())
     assert set(panel["partition"]) == {"train"}
+
+
+def test_grade_from_a_later_master_record_follows_the_company():
+    bonds, curves, macro, equity = _inputs()
+    bonds.loc[2, "mtrty_dt"] = pd.Timestamp("2028-06-30")  # B2: H flag, company AAA's other bond B1 is I
+    panel = build_panel(bonds, curves, macro, equity, load_config())
+    assert panel.loc[panel.cusip_id == "B2", "grade_bucket"].item() == "HY"  # record older than its trade: kept
+
+    bonds.loc[2, "stdt"] = pd.Timestamp("2025-03-31")  # record written after the bond's only trade
+    panel = build_panel(bonds, curves, macro, equity, load_config())
+    b2 = panel.loc[panel.cusip_id == "B2"].iloc[0]
+    assert b2["grade"] == "H" and b2["grade_bucket"] == "IG"
+

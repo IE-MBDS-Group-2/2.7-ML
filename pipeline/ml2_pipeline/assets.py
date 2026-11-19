@@ -240,6 +240,7 @@ def bond_month_panel(
     panel.to_parquet(path, index=False)
     sha = hashlib.sha256(path.read_bytes()).hexdigest()
 
+    relabelled = panel["grade"].map({"I": "IG", "H": "HY"}).fillna("NR") != panel["grade_bucket"]
     manifest = {
         "built_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "rows": len(panel),
@@ -254,6 +255,11 @@ def bond_month_panel(
             "rule": "stock data blanked where its company is not confirmed as the issuer (issuer code or name)",
             "issuers": int(panel["issuer_ticker"].isin(unconfirmed).groupby(panel["issuer_ticker"]).any().sum()),
             "rows": int(panel["issuer_ticker"].isin(unconfirmed).sum()),
+        },
+        "grade_from_issuer": {
+            "rule": "bonds whose master record is newer than all their trades take their company's majority grade",
+            "bonds": int(panel.loc[relabelled, "cusip_id"].nunique()),
+            "rows": int(relabelled.sum()),
         },
         "parquet": str(cfg["paths"]["panel_parquet"]),
         "sha256": sha,

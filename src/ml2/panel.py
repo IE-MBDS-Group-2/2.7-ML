@@ -18,6 +18,26 @@ MATURITY_BINS = [1, 3, 5, 7, 10, 20, np.inf]
 MATURITY_LABELS = ["1-3y", "3-5y", "5-7y", "7-10y", "10-20y", "20y+"]
 
 
+def issuer_consistent_grade(df: pd.DataFrame) -> pd.Series:
+    """IG or HY per row: the TRACE grade flag, unless the flag comes from a master record newer than the bond's trades.
+
+    The bond master keeps one record per bond, the latest, with its grade flag. When that record starts on or after
+    every snapshot the bond appears in, it was written after the bond traded (typically as the bond nears maturity
+    and its ratings are withdrawn; FINRA may then flag an unrated bond as non-investment grade), so its flag says
+    nothing about how the bond traded. Those bonds take the majority grade of their company's other bonds whose
+    record predates their trades. A company with no such bond keeps the flag.
+    """
+    raw = pd.Series(np.where(df["grade"] == "I", "IG", np.where(df["grade"] == "H", "HY", "NR")), index=df.index)
+    newer = (df["stdt"] >= df["snapshot_date"]).groupby(df["cusip_id"]).transform("all")
+    trusted = (
+        pd.DataFrame({"issuer": df["issuer_ticker"], "cusip": df["cusip_id"], "g": raw})[~newer]
+        .drop_duplicates("cusip")
+        .sort_values("cusip")
+    )
+    company = df["issuer_ticker"].map(trusted.groupby("issuer")["g"].agg(lambda s: s.value_counts().index[0]))
+    return raw.where(~newer | company.isna(), company)
+
+
 def build_panel(
     bonds: pd.DataFrame,
     curves: pd.DataFrame,
@@ -94,6 +114,9 @@ def build_panel(
     df["naive_dd"] = naive_distance_to_default(df["market_cap"], debt, df["vol_252d"], df["ret_252d"])
     df["sector"] = df["sector"].fillna("Unknown")
     df["sector_is_pit"] = df["sector_is_pit"].fillna(False).astype(bool)
+
+    # --- grade: the TRACE flag, corrected where it comes from a later record ---
+    df["grade_bucket"] = issuer_consistent_grade(df)
 
     # --- annex label: does the spread widen by the next month-end? ------------
     snaps = np.sort(df["snapshot_date"].unique())

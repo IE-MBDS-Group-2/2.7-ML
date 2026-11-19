@@ -23,6 +23,10 @@ The issuer's stock data (equity columns and sector) is left empty where the comp
 cannot be confirmed as the bond's issuer, by its issuer code (first 6 CUSIP characters) or by its name.
 The bond rows stay; the manifest counts them.
 
+The grade (IG or HY) is the TRACE flag from the bond's latest master record. Where that record is newer than all
+the bond's trades (usually written as the bond nears maturity and its ratings are withdrawn), the bond takes the
+majority grade of its company's other bonds instead. The manifest counts these bonds too.
+
 ## Columns
 
 Some columns contain the target or future information and must never be model inputs (list at the end).
@@ -62,8 +66,8 @@ Some columns contain the target or future information and must never be model in
 | `maturity_bucket` | Maturity bucket: 1-3y, 3-5y, 5-7y, 7-10y, 10-20y, 20y+ |
 | `coupon_pct` | Annual interest the bond pays, percent of face value |
 | `bond_age_years` | Approximate years since the bond was issued |
-| `grade` | Credit grade flag: I = investment grade, H = high yield (latest flag, not as of the snapshot) |
-| `grade_bucket` | IG or HY: the two strata for metrics and the quality gate |
+| `grade` | TRACE credit grade flag: I = investment grade, H = high yield (the bond's latest master record, not as of the snapshot) |
+| `grade_bucket` | IG or HY: the two strata for metrics and the quality gate. The TRACE flag, except for bonds whose master record is newer than all their trades: those take the majority grade of their company's other bonds |
 | `is_144a` | True for a privately placed bond (Rule 144A), usually less liquid |
 | `debt_type` | Debt type code (seniority and structure, e.g. S-NT senior note) |
 | `is_subordinated` | True if the bond is subordinated (paid after senior debt in a default) |
@@ -116,3 +120,11 @@ Some columns contain the target or future information and must never be model in
 | `sofr_pct` | SOFR: the overnight secured funding rate, percent |
 
 **Not allowed as model inputs:** `snapshot_date`, `cusip_id`, `issuer_ticker`, `issuer_name`, `partition`, `spread_bps`, `yield_pct`, `ust_yield_at_maturity_pct`, `price`, `spread_change_next_bps`, `widens_25bp`, `grade`.
+
+## Last build
+
+- Built (UTC): 2026-11-19T13:23:49+00:00
+- Rows: 181,113; bonds: 13,763; issuers: 804; snapshots: 27 (2024-01-31 to 2026-03-17)
+- Rows by partition: {'train': 114179, 'valid': 27689, 'test': 26464, 'gap': 12781}
+- Rows by grade: {'IG': 166015, 'HY': 15098}
+- Parquet sha256: `92d3aeb8cdc98d851a2d4963e3beeab154b86750bd4b5bb5a4854870d23e7553`
