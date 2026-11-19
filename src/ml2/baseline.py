@@ -6,7 +6,10 @@
     matrix_same_date       matrix pricing re-marked on every snapshot date: the gate baseline
 
 Matrix pricing = the median spread of bonds in the same grade x maturity bucket x sector cell. When a cell holds
-fewer than `min_bonds` bonds it falls back to grade x maturity, then grade, then all bonds.
+fewer than `min_bonds` bonds it falls back to grade x maturity, then grade, then all bonds. The two versions count
+differently: the frozen matrix counts distinct bonds over all fitting months; the same-date matrix counts other
+companies' bonds on that one date. HY cells are thin on a single date, so most HY bonds are priced at grade x
+maturity level (about 90% on valid), IG bonds at grade x maturity x sector level (about 96%).
 
 The gate baseline works like a pricing desk: on each snapshot date, a bond is priced from the same-date spreads of
 other companies' bonds in its cell. Its own company is left out, so a bond never prices itself or its sister bonds.
@@ -53,12 +56,17 @@ def matrix_same_date(
     Uses only same-date spreads of other issuers, which a desk observes when it marks an untraded bond.
     Rows with a missing target never serve as peers.
     """
+    if not df.index.is_unique:
+        raise ValueError("matrix_same_date needs a unique index (reset_index after concatenating frames)")
+    # A bond with no company is its own company: it must never price itself or be merged with other such bonds
+    own = "bond:" + df["cusip_id"].astype(str)
+    df = df.assign(**{issuer: df[issuer].astype(object).where(df[issuer].notna(), own)})
     data = df[df[target].notna()]
     out = pd.Series(np.nan, index=df.index, name="pred_matrix_same_date")
     for _, day in df.groupby("snapshot_date"):
         peers_day = data.loc[data.index.intersection(day.index)]
         for iss, rows in day.groupby(issuer, dropna=False):
-            peers = peers_day[peers_day[issuer] != iss] if pd.notna(iss) else peers_day
+            peers = peers_day[peers_day[issuer] != iss]
             pred = pd.Series(np.nan, index=rows.index)
             for keys in LEVELS:
                 g = peers.groupby(keys, observed=True)[target].agg(["median", "size"])

@@ -7,8 +7,11 @@ Two sources, same columns:
 Example
     from ml2.data import check_panel, load_panel
     check_panel()                           # your parquet file is the shared version
-    df = load_panel()                       # whole panel
+    df = load_panel()                       # train, gap and valid: test is left out
     train = load_panel(partitions=["train"])
+
+The test partition is opened once, in 99_final: load_panel refuses it unless include_test=True, which only the final
+notebook passes, after ml2.final.open_test_once has locked the model.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from dotenv import load_dotenv
 from ml2.config import load_config, repo_root, resolve
 
 PANEL_TABLE = "ml2.bond_month_panel"
+PARTITIONS = ["train", "gap", "valid", "test"]
 DICTIONARY_TABLE = "ml2.column_dictionary"
 
 
@@ -38,16 +42,29 @@ def load_panel(
     source: str = "auto",
     columns: Iterable[str] | None = None,
     partitions: Iterable[str] | None = None,
+    include_test: bool = False,
 ) -> pd.DataFrame:
     """Return the bond-month panel as a DataFrame.
 
     source: "auto" (database if ML2_DB_URL is set, else parquet), "db" or "parquet".
     columns: optional subset of columns.
-    partitions: optional subset of {"train", "gap", "valid", "test"}.
+    partitions: optional subset of {"train", "gap", "valid", "test"}; default: all but test.
+    include_test: only 99_final sets this, after open_test_once.
     """
+    parts = list(partitions) if partitions else [p for p in PARTITIONS if p != "test" or include_test]
+    if "test" in parts and not include_test:
+        raise PermissionError(
+            "The test partition is opened once, in 99_final (include_test=True after ml2.final.open_test_once)."
+        )
+    partitions = parts
     url = _db_url()
     use_db = source == "db" or (source == "auto" and url is not None)
     cols = list(columns) if columns else None
+    if cols is not None and "partition" not in cols:
+        cols = cols + ["partition"]
+        drop_partition = True
+    else:
+        drop_partition = False
 
     if use_db:
         if url is None:
@@ -73,6 +90,8 @@ def load_panel(
         if partitions:
             df = df[df["partition"].isin(list(partitions))]
 
+    if drop_partition:
+        df = df.drop(columns="partition")
     if "snapshot_date" in df.columns:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"])
     return df.reset_index(drop=True)

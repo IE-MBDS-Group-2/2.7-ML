@@ -42,6 +42,23 @@ The grade (IG or HY) is the TRACE flag from the bond's latest master record. Whe
 the bond's trades (usually written as the bond nears maturity and its ratings are withdrawn), the bond takes the
 majority grade of its company's other bonds instead. The manifest counts these bonds too.
 
+The company behind each bond is its ticker's listed company on the snapshot date, unless the issuer-code map (first
+6 CUSIP characters to company) gives exactly one listed company that is not flagged ambiguous: then that company.
+Stock data is computed per company, so a ticker reused by another company never mixes two price histories.
+Debt is taken only from filings reported in US dollars. Market cap is left empty when the share count it implies
+jumps more than 2.5 times against the previous three snapshots (a data error, not a market move). Sector names
+from company profiles are mapped to the GICS names of the sector history.
+
+`widens_25bp` uses the bond's spread on the next snapshot even when that row is not in the table (a spread or yield
+past the bounds above, or no stock data), so the bonds that blow out are not lost from the label. Month-end
+snapshots skip half-days, such as the day after Thanksgiving. `bond_age_years` is not a model input: it is dated
+by the bond's latest master record, which can postdate the trade.
+
+## Columns
+
+Some columns contain the target or future information and must never be model inputs (list at the end).
+`ml2.schema.feature_columns()` returns the allowed inputs.
+
 ## Columns
 
 Some columns contain the target or future information and must never be model inputs (list at the end).

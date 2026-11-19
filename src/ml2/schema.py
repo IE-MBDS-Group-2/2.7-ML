@@ -22,7 +22,7 @@ COLUMN_DOCS: list[tuple[str, str, str]] = [
     ("years_to_maturity", "bond", "Years until the bond repays its principal"),
     ("maturity_bucket", "bond", "Maturity bucket: 1-3y, 3-5y, 5-7y, 7-10y, 10-20y, 20y+"),
     ("coupon_pct", "bond", "Annual interest the bond pays, percent of face value"),
-    ("bond_age_years", "bond", "Approximate years since the bond was issued"),
+    ("bond_age_years", "bond", "Years since the start of the bond's latest master record, not its issue date. Not a feature: a record rewritten after the bond traded is future information"),
     ("grade", "bond", "TRACE credit grade flag: I = investment grade, H = high yield (the bond's latest master record, not as of the snapshot)"),
     ("grade_bucket", "bond", "IG or HY: the two strata for metrics and the quality gate. The TRACE flag, except for bonds whose master record is newer than all their trades: those take the majority grade of their company's other bonds"),
     ("is_144a", "bond", "True for a privately placed bond (Rule 144A), usually less liquid"),
@@ -66,6 +66,8 @@ NOT_FEATURES = [
     "spread_change_next_bps", "widens_25bp",
     # duplicate of grade_bucket
     "grade",
+    # dated by the latest master record, which can postdate the trade
+    "bond_age_years",
 ]
 
 
