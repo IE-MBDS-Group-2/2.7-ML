@@ -88,4 +88,3 @@ def test_grade_from_a_later_master_record_follows_the_company():
     panel = build_panel(bonds, curves, macro, equity, load_config())
     b2 = panel.loc[panel.cusip_id == "B2"].iloc[0]
     assert b2["grade"] == "H" and b2["grade_bucket"] == "IG"
-
