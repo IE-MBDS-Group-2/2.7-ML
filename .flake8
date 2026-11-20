@@ -2,3 +2,7 @@
 [flake8]
 max-line-length = 120
 exclude = .git,__pycache__,.pytest_cache,.pytest_tmp,.venv,notebooks,data,models,reports
+# The column documentation table reads better one column per line.
+per-file-ignores =
+    src/ml2/schema.py:E501
+    scripts/write_data_dictionary.py:E501

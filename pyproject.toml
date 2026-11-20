@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml2"
+version = "0.1.0"
+description = "ML II group project: corporate bond spread pricing with machine learning"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scikit-learn>=1.5",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary>=2.9",
+    "pyarrow>=14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov>=5", "flake8>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

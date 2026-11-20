@@ -1,6 +1,7 @@
-# environment.yml  [Shared conda environment]
+# environment.yml  [Shared conda environment for the team]
 # Create:  conda env create -f environment.yml
 # Update:  conda env update -f environment.yml --prune
+# The last line installs this repo's own package (src/ml2) in editable mode.
 name: ml2-group2
 channels:
   - conda-forge
@@ -9,13 +10,15 @@ dependencies:
   # data and modelling
   - pandas
   - numpy
-  - scipy
   - scikit-learn
   - lightgbm
   - xgboost
-  # files and settings
+  - shap
+  - scipy
+  # database and files
+  - sqlalchemy
+  - psycopg2
   - pyarrow
-  - openpyxl
   - pyyaml
   - python-dotenv
   # notebooks and plots
@@ -25,4 +28,8 @@ dependencies:
   - seaborn
   # quality
   - pytest
+  - pytest-cov
   - flake8
+  - pip
+  - pip:
+      - -e .

@@ -1,14 +1,37 @@
 # config.yaml  [Single source of truth for non-secret settings]
-# Change settings here, never hardcode them in notebooks.
+# Read by src/ml2/config.py. Change settings here, never hardcode them in notebooks.
 
 paths:
-  raw: data/raw
-  processed: data/processed
-  models: models
-  figures: reports/figures
+  panel_parquet: data/processed/bond_month_panel.parquet
+  manifest: data/processed/manifest.json
 
 problem:
-  target: null            # set once the project is chosen
-  type: null              # classification or regression
+  target: spread_bps                # regression target (main report)
+  annex_target: widens_25bp         # classification target (technical annex, Naive Bayes)
+  widen_threshold_bps: 25
+  id_columns: [cusip_id, snapshot_date]
+  group_column: issuer_ticker       # for issuer-grouped validation
 
-random_state: 42
+split:
+  # Chronological, with one empty month between partitions to limit leakage.
+  train_end: "2025-05-31"           # 2024-01 .. 2025-05 (17 month-ends)
+  valid_start: "2025-07-01"         # 2025-06 is the gap
+  valid_end: "2025-10-31"           # 2025-07 .. 2025-10 (4 month-ends)
+  test_start: "2025-12-01"          # 2025-11 is the gap
+  test_end: "2026-03-31"            # 2025-12 .. 2026-03 (4 snapshots; opened once at the end)
+
+quality_gate:
+  # Fixed before any logged run. Do not move it after seeing results.
+  # Tightened once on 17 Nov 2026, before any logged run and with test unopened: the baseline is now matrix pricing
+  # re-marked on every snapshot date (as a desk does), not frozen at the training months. See docs/SCOPE.md.
+  metric: mae_bps
+  baseline: matrix_same_date        # ml2.baseline.matrix_same_date
+  reference_baselines: [median, matrix_frozen]   # reported in the final table, not gated
+  min_improvement: 0.10             # best model must beat the baseline by >= 10% ...
+  ci_excludes_zero: true            # ... and the 95% interval of that improvement must lie above zero ...
+  strata: [IG, HY]                  # ... in every stratum, on the test partition
+  bootstrap:                        # interval: resample whole companies, since their bonds move together
+    cluster: issuer_ticker
+    n_boot: 1000
+    level: 0.95
+    seed: 42
