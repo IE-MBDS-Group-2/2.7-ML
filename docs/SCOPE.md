@@ -11,8 +11,8 @@ The usual fallback is **matrix pricing**: look up a typical spread for the bond'
 apply it. We predict each bond's **credit spread** from its terms, its trading activity, the issuing company's
 stock and balance sheet, and the market backdrop, and test whether machine learning beats matrix pricing.
 Every ML II method with a class notebook gets a role, and our code follows that notebook: decision trees, bagging,
-random forest and boosting (XGBoost, LightGBM), KNN, and Naive Bayes on a classification variant in the technical
-annex. The neural network is on standby until its class notebook is released.
+random forest and boosting (XGBoost, LightGBM), KNN, a perceptron and a small neural network (MLP), and Naive
+Bayes on a classification variant in the technical annex.
 
 **Audience for the report:** the head of a bank's bond pricing team, not the professor.
 
@@ -84,7 +84,7 @@ the future. Using any of them is leakage.
 | Ensembles | Bagging, random forest, XGBoost, LightGBM; out-of-bag error, permutation importance, SHAP | Regression_Improve Bagg & RF with Boosting, RF_risk | Likely the most accurate on tables like ours |
 | Comparable bonds | KNN regression, k tuned, scaled features, bagged KNN | 2. KNN_IBM attrition | "Price a bond from its most similar bonds": how traders already think |
 | Classification annex | Gaussian and Categorical Naive Bayes against the other classifiers, threshold from out-of-fold predictions | 2. Naive_Bayes_SMS | Section 8 |
-| *On standby* | Neural network (MLP) | None yet | Added only if its class notebook is released in time |
+| Neural network | Perceptron (one neuron, a linear model fitted by gradient descent) and an MLP with two hidden layers, dropout, L2 and early stopping on the last training months; a random forest on the same rows for comparison | Perceptron_MLP_IBM_attrition, Mnist_mlp_CNN_generalization | Answers "can a neural network price bonds?" against the same bar |
 
 Adaptations to the class notebooks, the same everywhere: time-ordered folds from `ml2.splits` instead of shuffled
 `KFold`, the shared preprocessing from `ml2.features`, and grid searches on a 30% sample of the 114k training rows.
@@ -134,18 +134,19 @@ assumption hurts when features are correlated (for example `vol_20d` and `vol_60
 
 ## 9. Roles and proposed issues
 
-Six numbered roles. With five people, roles 4 and 5 merge (KNN and the annex fit together well). Everyone writes
-their part of the annex and presents what they built.
+Seven numbered roles for six people: Miguel takes roles 1 and 2, and each of the other five takes one role from 3
+to 7. Everyone writes the report section and the annex section for their own part and presents what they built;
+role 7 edits the sections into one report.
 
 | # | Role | Owner | Notebook | Issues |
 |---|---|---|---|---|
 | 1 | Data and integration | Miguel | `00_data_access`, `99_final` | P1, P2, P3, P13, P14, P18 |
-| 2 | EDA and baseline | | `01_eda`, `02_baseline_matrix_pricing` | P4, P5 |
+| 2 | EDA and baseline | Miguel | `01_eda`, `02_baseline_matrix_pricing` | P4, P5 |
 | 3 | Trees and ensembles | | `03_trees_ensembles` | P6, P7, P8 |
 | 4 | KNN comparable bonds | | `04_knn_comparables` | P9, P10 |
-| 5 | Classification annex (Naive Bayes) | | `06_annex_classification` | P11, P12 |
-| 6 | Report and deck | | report, annex assembly, deck | P15, P16, P17 |
-| | *Neural network: on standby* | | `05_neural_network`, empty until its class notebook exists | none yet |
+| 5 | Neural network | | `05_neural_network` | P19 |
+| 6 | Classification annex (Naive Bayes) | | `06_annex_classification` | P11, P12 |
+| 7 | Report editing and deck | | report and annex sections from every owner, deck | P15, P16, P17 |
 
 If this proposal is chosen, each row below becomes a GitHub issue in a milestone "Bond pricing, submission Sun 22
 Nov", labelled by type (`decision`, `infra`, `data`, `model`, `docs`) and by wave (`wave-0` to `wave-3`, the
@@ -164,14 +165,15 @@ real numbers. Every issue closes through a pull request into `dev`, reviewed by 
 | P8 | Model: gradient boosting (XGBoost, LightGBM), tuned on a sample of train | 3 | 2 (Fri 20) | Best settings and valid MAE in RUN_LOG; gain over the gate baseline on valid |
 | P9 | Model: KNN comparable bonds, scaling and the choice of k | 4 | 1 (Thu 19) | Error against k plotted; valid MAE in RUN_LOG |
 | P10 | Model: bagged KNN and the "company never seen before" test | 4 | 2 (Fri 20) | Issuer-grouped folds result in RUN_LOG, next to the time-ordered one |
-| P11 | Model: Naive Bayes on `widens_25bp` | 5 | 2 (Fri 20) | Recall, precision and AUC on valid in RUN_LOG |
-| P12 | Model: Naive Bayes against the other classifiers (tree, forest, KNN) | 5 | 2 (Fri 20) | One comparison table and the annex section drafted |
+| P11 | Model: Naive Bayes on `widens_25bp` | 6 | 2 (Fri 20) | Recall, precision and AUC on valid in RUN_LOG |
+| P12 | Model: Naive Bayes against the other classifiers (tree, forest, KNN) | 6 | 2 (Fri 20) | One comparison table and the annex section drafted |
 | P13 | Decision: choose the best model on valid, with settings frozen on Fri 20 | 1 | 3 (Sat 21) | Choice and reasons in RUN_LOG before test is opened |
 | P14 | Notebook: `99_final`, refit, score test once, `gate_report` and the headline table | 1 | 3 (Sat 21) | Runs top to bottom from the panel; gate verdict with 95% intervals |
-| P15 | Docs: the 4-page report for the head of pricing | 6 | 3 (Sun 22) | Numbers only from `99_final`; a teammate has reviewed it |
-| P16 | Docs: technical annex assembled from RUN_LOG and each owner's part | 6 | 3 (Sun 22) | Every model and every run in RUN_LOG covered, gate change stated |
-| P17 | Docs: final deck and dry run | 6 | 3 (Sun 22) | Every member presents what they built, within 12 minutes |
+| P15 | Docs: the 4-page report for the head of pricing, from each owner's section | 7 | 3 (Sun 22) | Every owner's section in by Sat 21 at 18:00; numbers only from `99_final`; a teammate has reviewed it |
+| P16 | Docs: technical annex assembled from RUN_LOG and each owner's part | 7 | 3 (Sun 22) | Every model and every run in RUN_LOG covered, gate change stated |
+| P17 | Docs: final deck and dry run | 7 | 3 (Sun 22) | Every member presents what they built, within 12 minutes |
 | P18 | Release: submission zip (report, annex, database with data dictionary, notebook, deck) | 1 | 3 (Sun 22) | Zip checked against the brief's five items and uploaded before 23:59 |
+| P19 | Model: perceptron and MLP against the bar and a random forest on the same rows | 5 | 3 (Sat 21) | Valid MAE in RUN_LOG; candidate or not for the final table decided before test is opened |
 
 ## 10. Plan
 
