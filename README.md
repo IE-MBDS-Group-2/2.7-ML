@@ -29,7 +29,7 @@ Put `bond_month_panel.parquet` and `manifest.json` from the group folder in `dat
 from ml2.data import load_panel
 from ml2.schema import feature_columns
 
-df = load_panel()                           # whole panel
+df = load_panel()                           # every partition except test (opened once, in 99_final)
 train = load_panel(partitions=["train"])    # one partition
 X_cols = feature_columns()                  # allowed model inputs
 ```
