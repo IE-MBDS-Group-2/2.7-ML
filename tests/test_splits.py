@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 from ml2.config import load_config
@@ -34,3 +35,18 @@ def test_issuer_folds_never_split_an_issuer():
     groups = pd.Series(["A", "A", "B", "B", "C", "C", "D", "E", "E", "F"])
     for tr, va in issuer_group_folds(groups, n_splits=3):
         assert set(groups.iloc[tr]).isdisjoint(set(groups.iloc[va]))
+
+
+def test_issuer_holdout_folds_hold_size_and_months_fixed():
+    from ml2.splits import issuer_holdout_folds
+
+    months = pd.date_range("2024-01-31", periods=12, freq="ME")
+    dates = pd.Series(np.repeat(months, 50))
+    groups = pd.Series([f"C{i % 25}" for i in range(len(dates))])
+    for seen, unseen, held in issuer_holdout_folds(dates, groups, n_folds=3, min_train_months=4):
+        held_companies = set(groups.iloc[held])
+        assert held_companies and not held_companies & set(groups.iloc[unseen])  # never seen
+        assert held_companies <= set(groups.iloc[seen])                          # seen
+        assert len(seen) == len(unseen)                                          # same amount of data
+        assert dates.iloc[seen].max() == dates.iloc[unseen].max()                # same months
+        assert dates.iloc[held].min() > dates.iloc[unseen].max()                 # scored later

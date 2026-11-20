@@ -55,3 +55,20 @@ def test_frozen_matrix_and_median():
     valid = _cell_panel(dates=("2025-07-31",), issuers=25, level=500.0)
     assert (median_baseline(train, valid) == 112.0).all()
     assert (predict_matrix_frozen(fit_matrix_frozen(train), valid) == 112.0).all()
+
+
+def test_bond_without_company_never_prices_itself():
+    df = _cell_panel(issuers=21)
+    df.loc[0, "issuer_ticker"] = None
+    df.loc[0, "spread_bps"] = 10_000.0  # if it priced itself, the median would not move, so check peers directly
+    pred = matrix_same_date(df)
+    others = df[(df.snapshot_date == df.loc[0, "snapshot_date"]) & (df.index != 0)]["spread_bps"]
+    assert pred.loc[0] == others.median()
+
+
+def test_same_date_needs_a_unique_index():
+    import pytest
+
+    df = _cell_panel()
+    with pytest.raises(ValueError, match="unique index"):
+        matrix_same_date(pd.concat([df, df]))

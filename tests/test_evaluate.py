@@ -76,3 +76,34 @@ def test_gate_with_interval_passes_a_clear_win():
     ok, table = gate_report(df, "y", "model", "base", cfg)
     assert ok
     assert (table["ci_low"] > 0.10).all()
+
+
+def test_gate_uses_the_same_rows_for_estimate_and_interval():
+    rng = np.random.default_rng(0)
+    n = 400
+    df = pd.DataFrame({
+        "issuer_ticker": [f"I{i % 40}" for i in range(n)],
+        "grade_bucket": ["IG"] * (n // 2) + ["HY"] * (n // 2),
+        "y": rng.normal(100, 20, n),
+    })
+    df["model"] = df["y"] + rng.normal(0, 5, n)
+    df["base"] = df["y"] + rng.normal(0, 10, n)
+    df.loc[df.index[:60], "base"] = np.nan  # the baseline misses some rows
+    cfg = {"metric": "mae_bps", "min_improvement": 0.1, "ci_excludes_zero": True, "strata": ["IG", "HY"],
+           "bootstrap": {"n_boot": 200, "seed": 1}}
+    ok, table = gate_report(df, "y", "model", "base", cfg)
+    common = df.dropna(subset=["base"])
+    ig = common[common.grade_bucket == "IG"]
+    expected = 1 - (ig["model"] - ig["y"]).abs().mean() / (ig["base"] - ig["y"]).abs().mean()
+    assert abs(table.loc["IG", "improvement"] - expected) < 1e-12
+    assert table.loc["IG", "ci_low"] <= table.loc["IG", "improvement"] <= table.loc["IG", "ci_high"]
+
+
+def test_gate_names_a_missing_stratum():
+    import pytest
+
+    df = pd.DataFrame({"issuer_ticker": ["A", "B"], "grade_bucket": ["IG", "IG"], "y": [1.0, 2.0],
+                       "model": [1.0, 2.0], "base": [1.5, 2.5]})
+    cfg = {"metric": "mae_bps", "min_improvement": 0.1, "ci_excludes_zero": True, "strata": ["IG", "HY"]}
+    with pytest.raises(ValueError, match="HY"):
+        gate_report(df, "y", "model", "base", cfg)

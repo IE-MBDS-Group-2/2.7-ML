@@ -2,6 +2,7 @@
 # Create:  conda env create -f environment.yml
 # Update:  conda env update -f environment.yml --prune
 # The last line installs this repo's own package (src/ml2) in editable mode.
+# Already created it before 20 Nov? Run the update line to add TensorFlow.
 name: ml2-group2
 channels:
   - conda-forge
@@ -32,4 +33,6 @@ dependencies:
   - flake8
   - pip
   - pip:
+      # neural network notebook only (05); pip wheels work on Windows, macOS and Linux
+      - tensorflow>=2.18
       - -e .
