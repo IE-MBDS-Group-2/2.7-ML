@@ -134,18 +134,18 @@ assumption hurts when features are correlated (for example `vol_20d` and `vol_60
 
 ## 9. Roles and proposed issues
 
-Seven numbered roles for six people: Miguel takes roles 1 and 2, and each of the other five takes one role from 3
-to 7. Everyone writes the report section and the annex section for their own part and presents what they built;
+Six people: Miguel takes role 1, and each of the other five takes one role from 3 to 7. Role 2 (EDA and
+baselines) is part of role 6. Everyone writes the report section and the annex section for their own part and presents what they built;
 role 7 edits the sections into one report.
 
 | # | Role | Owner | Notebook | Issues |
 |---|---|---|---|---|
 | 1 | Data and integration | Miguel | `00_data_access`, `99_final` | P1, P2, P3, P13, P14, P18 |
-| 2 | EDA and baseline | Miguel | `01_eda`, `02_baseline_matrix_pricing` | P4, P5 |
+| 2 | EDA and baseline (part of role 6) | | `01_eda`, `02_baseline_matrix_pricing` | P4, P5 |
 | 3 | Trees and ensembles | | `03_trees_ensembles` | P6, P7, P8 |
 | 4 | KNN comparable bonds | | `04_knn_comparables` | P9, P10 |
 | 5 | Neural network | | `05_neural_network` | P19 |
-| 6 | Classification annex (Naive Bayes) | | `06_annex_classification` | P11, P12 |
+| 6 | EDA, baselines and classification annex (Naive Bayes) | | `01_eda`, `02_baseline_matrix_pricing`, `06_annex_classification` | P4, P5, P11, P12 |
 | 7 | Report editing and deck | | report and annex sections from every owner, deck | P15, P16, P17 |
 
 If this proposal is chosen, each row below becomes a GitHub issue in a milestone "Bond pricing, submission Sun 22
