@@ -1,0 +1,28 @@
+# environment.yml  [Shared conda environment]
+# Create:  conda env create -f environment.yml
+# Update:  conda env update -f environment.yml --prune
+name: ml2-group2
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  # data and modelling
+  - pandas
+  - numpy
+  - scipy
+  - scikit-learn
+  - lightgbm
+  - xgboost
+  # files and settings
+  - pyarrow
+  - openpyxl
+  - pyyaml
+  - python-dotenv
+  # notebooks and plots
+  - jupyterlab
+  - ipykernel
+  - matplotlib
+  - seaborn
+  # quality
+  - pytest
+  - flake8

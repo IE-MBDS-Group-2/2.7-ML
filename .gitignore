@@ -1,0 +1,50 @@
+# .gitignore  [What Git must never track]
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# Environments and secrets
+.env
+.env.*
+!.env.example
+.venv/
+env/
+venv/
+
+# Tooling
+.pytest_cache/
+.pytest_tmp/
+.coverage
+htmlcov/
+
+# Personal AI assistant instructions
+CLAUDE.local.md
+.claude/
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+
+# Data: never in Git
+data/**
+!data/
+!data/raw/
+!data/processed/
+!data/**/.gitkeep
+!data/**/README.md
+
+# Generated outputs
+models/**
+!models/
+!models/README.md
+reports/**
+!reports/
+!reports/README.md
+!reports/figures/
+!reports/figures/.gitkeep
