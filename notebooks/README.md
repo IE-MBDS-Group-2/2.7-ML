@@ -5,8 +5,8 @@ The lab. One owner per notebook; shared code goes in `src/ml2`, not copied betwe
 | Notebook | Content | Owner |
 |---|---|---|
 | `00_data_access.ipynb` | Check your parquet copy, load the panel, first look | Miguel |
-| `01_eda.ipynb` | Exploratory analysis: spreads by grade, maturity, sector; missing values; outliers | Miguel |
-| `02_baseline_matrix_pricing.ipynb` | Baselines from `ml2.baseline`: matrix pricing re-marked each date (the bar to beat), frozen matrix and median for reference | Miguel |
+| `01_eda.ipynb` | Exploratory analysis: spreads by grade, maturity, sector; missing values; outliers | Role 6 |
+| `02_baseline_matrix_pricing.ipynb` | Baselines from `ml2.baseline`: matrix pricing re-marked each date (the bar to beat), frozen matrix and median for reference | Role 6 |
 | `03_trees_ensembles.ipynb` | Regression tree, bagging, random forest, gradient boosting | Role 3 |
 | `04_knn_comparables.ipynb` | KNN "comparable bonds" pricing | Role 4 |
 | `05_neural_network.ipynb` | Perceptron and MLP (Keras), against the bar and a random forest on the same rows | Role 5 |
