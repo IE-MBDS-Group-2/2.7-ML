@@ -29,6 +29,7 @@ python scripts/write_data_dictionary.py                                         
 |---|---|
 | `pipeline/ml2_pipeline/` | Dagster assets, resources (read-only source, owner target), SQL |
 | `src/ml2/panel.py`, `curves.py`, `equity.py` | Panel logic: spread target, equity features, labels (tested) |
+| `src/ml2/db.py` | Table load into the group database: drop, recreate and COPY in one transaction, so a failed load keeps the previous table (tested) |
 | `docker/Dockerfile`, `docker/requirements.txt` | Loader image (Dagster 1.13.27) |
 | `docker/initdb/01-init.sql` | Schema `ml2`, role `ml2_read`, default grants |
 | `docker-compose.yml` | `groupdb` (Postgres 16) and `dagster` |

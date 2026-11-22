@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import io
-
 import pandas as pd
 from dagster import ConfigurableResource
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+
+from ml2.db import replace_table
 
 
 class PostgresResource(ConfigurableResource):
@@ -31,24 +31,7 @@ class PostgresResource(ConfigurableResource):
             conn.execute(text(sql))
 
     def replace_table(self, df: pd.DataFrame, schema: str, table: str) -> int:
-        """Drop and recreate schema.table from df, loading rows with COPY. Returns the row count."""
+        """Replace schema.table with df in one transaction (see ml2.db.replace_table). Returns the row count."""
         if self.read_only:
             raise RuntimeError("This resource is read-only")
-        engine = self.engine()
-        out = df.copy()
-        for col in out.columns:
-            if pd.api.types.is_datetime64_any_dtype(out[col]):
-                out[col] = out[col].dt.date
-        out.head(0).to_sql(table, engine, schema=schema, if_exists="replace", index=False)
-        buf = io.StringIO()
-        out.to_csv(buf, index=False, header=False, na_rep="")
-        buf.seek(0)
-        cols = ", ".join(f'"{c}"' for c in out.columns)
-        raw = engine.raw_connection()
-        try:
-            with raw.cursor() as cur:
-                cur.copy_expert(f'COPY "{schema}"."{table}" ({cols}) FROM STDIN WITH (FORMAT csv, NULL \'\')', buf)
-            raw.commit()
-        finally:
-            raw.close()
-        return len(out)
+        return replace_table(self.engine(), df, schema, table)

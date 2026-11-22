@@ -9,6 +9,23 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      # Throwaway Postgres for tests/test_db.py (the group database load). Lives only for this job.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ml2_test
+          POSTGRES_PASSWORD: ml2_test
+          POSTGRES_DB: ml2_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ml2_test -d ml2_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ML2_TEST_DB_URL: postgresql+psycopg2://ml2_test:ml2_test@localhost:5432/ml2_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,4 +37,4 @@ jobs:
         run: flake8 .
       - name: Test
         # pytest exits with 5 when there are no tests yet; treat that as a pass.
-        run: pytest || [ $? -eq 5 ]
+        run: pytest -rs || [ $? -eq 5 ]
