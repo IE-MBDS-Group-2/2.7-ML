@@ -51,7 +51,8 @@ def improvement_ci(
     d = df[[cluster, y_true, y_model, y_base]].dropna(subset=[y_true, y_model, y_base])
     errors = pd.DataFrame(
         {
-            "cluster": d[cluster].astype(str).to_numpy(),
+            # a missing company is its own cluster, never one big "nan" cluster
+            "cluster": d[cluster].astype(object).where(d[cluster].notna(), "row" + d.index.astype(str)).astype(str),
             "model": (d[y_model] - d[y_true]).abs().to_numpy(),
             "base": (d[y_base] - d[y_true]).abs().to_numpy(),
         }
@@ -105,6 +106,11 @@ def gate_report(
 
     ok, table = gate_report(test, "spread_bps", "pred_best", "pred_matrix_same_date", cfg["quality_gate"])
     """
+    # The point estimate and the interval use the same rows: those where the target and both predictions exist
+    df = df.dropna(subset=[y_true, y_model, y_base])
+    missing = [s for s in gate_cfg["strata"] if not (df[by] == s).any()]
+    if missing:
+        raise ValueError(f"No rows with a target and both predictions in stratum {missing}")
     boot = gate_cfg.get("bootstrap", {})
     ci = {
         s: improvement_ci(

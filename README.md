@@ -4,7 +4,7 @@ Machine Learning II group project, IE MBDS (Group 2). **Due Sun 22 Nov 2026, 23:
 
 A bank's pricing team has to put a fair price on thousands of corporate bonds every day, but most bonds do not
 trade on a given day. Today the fallback is **matrix pricing**: a spread looked up from rating, maturity and
-sector buckets. We predict each bond's **credit spread** (its extra yield over a Treasury bond of the same maturity)
+sector buckets, re-marked each day from the bonds that did trade. We predict each bond's **credit spread** (its extra yield over a Treasury bond of the same maturity)
 from the bond's terms, how often it trades, the issuing company's stock and balance sheet, and the market backdrop,
 and test whether machine learning beats matrix pricing.
 
@@ -22,13 +22,14 @@ conda activate ml2-group2
 copy .env.example .env        # macOS/Linux: cp .env.example .env
 ```
 
-Paste the `ML2_DB_URL=...` line Miguel sends you into `.env`, then in a notebook:
+Put `bond_month_panel.parquet` and `manifest.json` from the group folder in `data/processed/`
+([docs/DATA_ACCESS.md](docs/DATA_ACCESS.md)), run `notebooks/00_data_access.ipynb`, then in a notebook:
 
 ```python
 from ml2.data import load_panel
 from ml2.schema import feature_columns
 
-df = load_panel()                           # whole panel
+df = load_panel()                           # every partition except test (opened once, in 99_final)
 train = load_panel(partitions=["train"])    # one partition
 X_cols = feature_columns()                  # allowed model inputs
 ```
@@ -41,21 +42,22 @@ X_cols = feature_columns()                  # allowed model inputs
 ├── config.yaml              # target, split dates, quality gate (single source of truth)
 ├── environment.yml          # team conda environment (installs src/ml2 in editable mode)
 ├── pyproject.toml           # the ml2 package
-├── .env.example             # copy to .env (gitignored) and paste your database login
+├── .env.example             # copy to .env (gitignored); a database login only if we use one
 ├── docs/
 │   ├── SCOPE.md             # project scope, plan, roles, finance primer
 │   ├── DATA_ACCESS.md
 │   └── DATA_DICTIONARY.md
 ├── notebooks/               # the lab: one owner per notebook, RUN_LOG.md for every model run
 ├── src/ml2/                 # shared code every notebook imports
-│   ├── data.py              #   load_panel(): group database or parquet
+│   ├── data.py              #   check_panel(), load_panel(): parquet or group database
 │   ├── schema.py            #   columns, meanings, allowed features
 │   ├── features.py          #   xy() and the shared preprocessing recipe
 │   ├── splits.py            #   chronological partitions, walk-forward and issuer-grouped folds
 │   ├── baseline.py          #   median and matrix-pricing baselines (one definition for everyone)
-│   └── evaluate.py          #   metrics in basis points, by stratum, quality gate with bootstrap interval
+│   ├── evaluate.py          #   metrics in basis points, by stratum, quality gate with bootstrap interval
+│   └── final.py             #   open_test_once(): test is scored once, for one model
 ├── scripts/                 # write_data_dictionary.py
-├── data/                    # gitignored: processed/bond_month_panel.parquet if you use the file
+├── data/                    # gitignored: processed/bond_month_panel.parquet and manifest.json
 ├── models/                  # gitignored: saved models
 ├── reports/                 # gitignored: figures for the report and deck
 └── tests/                   # pytest
@@ -63,7 +65,7 @@ X_cols = feature_columns()                  # allowed model inputs
 
 ## Rules of the road
 
-- **Data never goes to GitHub.** It is licensed. It lives in the group database and in the submission zip only.
+- **Data never goes to GitHub.** It is licensed. It lives in the private group folder (and the group database, if used) and in the submission zip only.
 - **No random splits.** Use `ml2.splits`: chronological partitions with a one-month gap, plus issuer-grouped folds.
 - **The test partition is opened once**, at the end, for the final results table.
 - **The quality gate is fixed** in `config.yaml` (tightened once, before any logged run; see `docs/SCOPE.md`). Do not change it after seeing results.

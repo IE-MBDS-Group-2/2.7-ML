@@ -11,8 +11,8 @@ The usual fallback is **matrix pricing**: look up a typical spread for the bond'
 apply it. We predict each bond's **credit spread** from its terms, its trading activity, the issuing company's
 stock and balance sheet, and the market backdrop, and test whether machine learning beats matrix pricing.
 Every ML II method with a class notebook gets a role, and our code follows that notebook: decision trees, bagging,
-random forest and boosting (XGBoost, LightGBM), KNN, and Naive Bayes on a classification variant in the technical
-annex. The neural network is on standby until its class notebook is released.
+random forest and boosting (XGBoost, LightGBM), KNN, a perceptron and a small neural network (MLP), and Naive
+Bayes on a classification variant in the technical annex.
 
 **Audience for the report:** the head of a bank's bond pricing team, not the professor.
 
@@ -25,7 +25,7 @@ annex. The neural network is on standby until its class notebook is released.
 | **Treasury yield** | The yield of a US government bond: the "risk-free" benchmark for the same maturity |
 | **Credit spread** | Bond yield minus Treasury yield of the same maturity. The extra return investors want for the risk that the company does not pay. Measured in **basis points** (bp): 1 bp = 0.01%, so 150 bp = 1.5% |
 | **Investment grade (IG) / high yield (HY)** | Safer companies (spreads around 50 to 200 bp) versus riskier ones (around 250 to 1,000 bp). Our two strata |
-| **Matrix pricing** | Today's fallback: average spread for similar bonds (rating x maturity x sector). Our baseline |
+| **Matrix pricing** | Today's fallback: the median spread of similar bonds (rating x maturity x sector) that traded that day, re-marked every day. Our baseline and the bar for the quality gate |
 | **TRACE** | The US regulator's record of every corporate bond trade. Our source of real yields and volumes |
 | **Liquidity** | How often and how much a bond trades. Rarely traded bonds usually carry a higher spread |
 | **Equity signals** | When a company's stock is volatile, falling or highly leveraged, its bonds usually have higher spreads. That is why the issuer's stock data are features |
@@ -47,7 +47,7 @@ Graded points: executive summary, professional look, EDA, data processing and fe
 
 One table, `bond_month_panel`: one row per bond per month-end, January 2024 to March 2026. Miguel prepares it from
 TRACE (via IE's WRDS subscription), the US Treasury yield curve, market indicators and the issuers' stock prices
-and balance sheets. You get it through the read-only group database or as a parquet file:
+and balance sheets. You get it as a checksum-verified parquet file from the private group folder (a read-only group database is optional):
 [DATA_ACCESS.md](DATA_ACCESS.md). Every column is explained in [DATA_DICTIONARY.md](DATA_DICTIONARY.md).
 
 - **Bonds kept:** straight fixed-coupon corporate bonds of companies with a listed stock, traded on the month-end
@@ -55,7 +55,8 @@ and balance sheets. You get it through the read-only group database or as a parq
 - **Size:** about 181,000 bond-months: some 13,800 bonds from about 800 companies over 27 month-ends, about
   6,700 bonds per snapshot. Most rows are flagged investment grade (about 85%). Exact counts are in the data
   dictionary ("Last build").
-- **Licensed data:** it stays in the group and in the submission zip. Never commit it or share it.
+- **Licensed data:** it stays in the group and in the submission zip (sharing it with the professor confirmed on
+  19 Nov). Never commit it or share it with anyone else.
 
 ## 5. Target and features
 
@@ -83,7 +84,7 @@ the future. Using any of them is leakage.
 | Ensembles | Bagging, random forest, XGBoost, LightGBM; out-of-bag error, permutation importance, SHAP | Regression_Improve Bagg & RF with Boosting, RF_risk | Likely the most accurate on tables like ours |
 | Comparable bonds | KNN regression, k tuned, scaled features, bagged KNN | 2. KNN_IBM attrition | "Price a bond from its most similar bonds": how traders already think |
 | Classification annex | Gaussian and Categorical Naive Bayes against the other classifiers, threshold from out-of-fold predictions | 2. Naive_Bayes_SMS | Section 8 |
-| *On standby* | Neural network (MLP) | None yet | Added only if its class notebook is released in time |
+| Neural network | Perceptron (one neuron, a linear model fitted by gradient descent) and an MLP with two hidden layers, dropout, L2 and early stopping on the last training months; a random forest on the same rows for comparison | Perceptron_MLP_IBM_attrition, Mnist_mlp_CNN_generalization | Answers "can a neural network price bonds?" against the same bar |
 
 Adaptations to the class notebooks, the same everywhere: time-ordered folds from `ml2.splits` instead of shuffled
 `KFold`, the shared preprocessing from `ml2.features`, and grid searches on a 30% sample of the 114k training rows.
@@ -131,31 +132,58 @@ threshold on out-of-fold predictions as in the class notebook. A weak result is
 fine: the point is to show the classifiers from the course, and to explain why Naive Bayes's independence
 assumption hurts when features are correlated (for example `vol_20d` and `vol_60d`).
 
-## 9. Roles
+## 9. Roles and proposed issues
 
-| Role | Notebook |
-|---|---|
-| Data and integration (Miguel) | `00_data_access`, `99_final` |
-| EDA and baseline | `01_eda`, `02_baseline_matrix_pricing` |
-| Trees and ensembles | `03_trees_ensembles` |
-| KNN comparable bonds | `04_knn_comparables` |
-| Classification annex (Naive Bayes) | `06_annex_classification` |
-| *Neural network: on standby* | `05_neural_network`, empty until its class notebook exists |
-| Report and deck | report, annex assembly, deck |
+Seven numbered roles for six people: Miguel takes roles 1 and 2, and each of the other five takes one role from 3
+to 7. Everyone writes the report section and the annex section for their own part and presents what they built;
+role 7 edits the sections into one report.
 
-With fewer people, one person takes two roles (KNN plus the annex fit together well). Everyone presents what they built.
+| # | Role | Owner | Notebook | Issues |
+|---|---|---|---|---|
+| 1 | Data and integration | Miguel | `00_data_access`, `99_final` | P1, P2, P3, P13, P14, P18 |
+| 2 | EDA and baseline | Miguel | `01_eda`, `02_baseline_matrix_pricing` | P4, P5 |
+| 3 | Trees and ensembles | | `03_trees_ensembles` | P6, P7, P8 |
+| 4 | KNN comparable bonds | | `04_knn_comparables` | P9, P10 |
+| 5 | Neural network | | `05_neural_network` | P19 |
+| 6 | Classification annex (Naive Bayes) | | `06_annex_classification` | P11, P12 |
+| 7 | Report editing and deck | | report and annex sections from every owner, deck | P15, P16, P17 |
+
+If this proposal is chosen, each row below becomes a GitHub issue in a milestone "Bond pricing, submission Sun 22
+Nov", labelled by type (`decision`, `infra`, `data`, `model`, `docs`) and by wave (`wave-0` to `wave-3`, the
+day block it is due in). P numbers are placeholders until the issues are opened; the owners table then lists the
+real numbers. Every issue closes through a pull request into `dev`, reviewed by one teammate.
+
+| # | Issue | Role | Wave | Done when |
+|---|---|---|---|---|
+| P1 | Decision: agree roles, the IG/HY strata and the quality gate on the kickoff call | 1 | 0 (Wed 18) | Owners filled in above; decisions written here |
+| P2 | Setup: scaffold, shared `ml2` package, config and CI on `dev` | 1 | 0 (Wed 18) | PRs #1 and #2 merged; `pytest` and `flake8` pass in CI |
+| P3 | Data: the shared parquet file and its checksum check (group database optional) | 1 | 0 (Wed 18) | Everyone runs `00_data_access` and sees the row counts by partition |
+| P4 | Notebook: `01_eda`, the target, gaps, correlations and the IG/HY definition | 2 | 1 (Thu 19) | Figures in `reports/figures/`; the strata decision posted to the team |
+| P5 | Notebook: `02_baseline_matrix_pricing`, the three baselines on valid | 2 | 1 (Thu 19) | Valid MAE for IG, HY and all in RUN_LOG; slide 7 figure saved |
+| P6 | Model: regression tree with cost-complexity pruning | 3 | 1 (Thu 19) | Best alpha from time-ordered folds; valid MAE in RUN_LOG |
+| P7 | Model: bagging and random forest, with feature importance | 3 | 2 (Fri 20) | Valid MAE in RUN_LOG; importance plot saved |
+| P8 | Model: gradient boosting (XGBoost, LightGBM), tuned on a sample of train | 3 | 2 (Fri 20) | Best settings and valid MAE in RUN_LOG; gain over the gate baseline on valid |
+| P9 | Model: KNN comparable bonds, scaling and the choice of k | 4 | 1 (Thu 19) | Error against k plotted; valid MAE in RUN_LOG |
+| P10 | Model: bagged KNN and the "company never seen before" test | 4 | 2 (Fri 20) | Issuer-grouped folds result in RUN_LOG, next to the time-ordered one |
+| P11 | Model: Naive Bayes on `widens_25bp` | 6 | 2 (Fri 20) | Recall, precision and AUC on valid in RUN_LOG |
+| P12 | Model: Naive Bayes against the other classifiers (tree, forest, KNN) | 6 | 2 (Fri 20) | One comparison table and the annex section drafted |
+| P13 | Decision: choose the best model on valid, with settings frozen on Fri 20 | 1 | 3 (Sat 21) | Choice and reasons in RUN_LOG before test is opened |
+| P14 | Notebook: `99_final`, refit, score test once, `gate_report` and the headline table | 1 | 3 (Sat 21) | Runs top to bottom from the panel; gate verdict with 95% intervals |
+| P15 | Docs: the 4-page report for the head of pricing, from each owner's section | 7 | 3 (Sun 22) | Every owner's section in by Sat 21 at 18:00; numbers only from `99_final`; a teammate has reviewed it |
+| P16 | Docs: technical annex assembled from RUN_LOG and each owner's part | 7 | 3 (Sun 22) | Every model and every run in RUN_LOG covered, gate change stated |
+| P17 | Docs: final deck and dry run | 7 | 3 (Sun 22) | Every member presents what they built, within 12 minutes |
+| P18 | Release: submission zip (report, annex, database with data dictionary, notebook, deck) | 1 | 3 (Sun 22) | Zip checked against the brief's five items and uploaded before 23:59 |
+| P19 | Model: perceptron and MLP against the bar and a random forest on the same rows | 5 | 3 (Sat 21) | Valid MAE in RUN_LOG; candidate or not for the final table decided before test is opened |
 
 ## 10. Plan
 
-| Day | Work | Output |
-|---|---|---|
-| Mon 16 | Repo and data ready, roles agreed, everyone set up | Logins sent, environment working |
-| Tue 17 | EDA and matrix-pricing baseline; others set up and start on train/valid | `01_eda`, `02_baseline` |
-| Wed 18 | Trees, ensembles, KNN | Validation results in the run log |
-| Thu 19 | Classification annex; model choices frozen | Validation results in the run log |
-| Fri 20 | Choose the best model on validation, then open the test partition **once**. Interpretation | Final results table |
-| Sat 21 | Report (4 pages), technical annex, deck | Drafts |
-| Sun 22 | Dry run, fixes, zip, submit before 23:59 | Submission |
+| Day | Work | Output | Issues |
+|---|---|---|---|
+| Wed 18 | Project chosen, roles agreed, everyone set up with data access; EDA starts | Parquet shared, environment working | P1 to P3 |
+| Thu 19 | EDA and baselines (the baseline code is ready); first tree and KNN runs. Light day: ML Ops presentation | `01_eda`, `02_baseline`, first runs in the log | P4 to P6, P9 |
+| Fri 20 | Ensembles, bagged KNN and the new-company test, Naive Bayes annex; model settings frozen by the evening | Validation results in the run log | P7, P8, P10 to P12 |
+| Sat 21 | Morning: choose the best model on validation, then open the test partition **once**. Afternoon: report, annex and deck drafts | Final results table, drafts | P13, P14 |
+| Sun 22 | Report, annex and deck finished; dry run, zip, submit before 23:59 | Submission | P15 to P18 |
 
 ## 11. Known limits (say them in the report, briefly)
 
