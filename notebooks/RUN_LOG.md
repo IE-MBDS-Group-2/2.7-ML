@@ -13,6 +13,18 @@ One line per model run, including failures and dropped variants. Validation scor
 | 2026-11-19 | Miguel | 02_baseline_matrix_pricing | Matrix pricing, frozen at the training months | grade, maturity, sector | fit on train, scored on valid | 23.2 / 86.1 | Panel d817a09a. All: 27.9. Reference row |
 | 2026-11-19 | Miguel | 02_baseline_matrix_pricing | Matrix pricing, re-marked each date (gate baseline) | grade, maturity, sector | fit on train, scored on valid | 21.2 / 88.4 | Panel d817a09a. All: 26.2. The bar every model is gated against. In HY most cells fall back to grade x maturity |
 | 2026-11-19 | Miguel | scratch (target choice for the EDA, step 3) | XGBoost with the 03 settings (500 trees, depth 10, learning rate 0.03), on spread and on log(spread + 101) | all 33 | fit on train, scored on valid | spread 15.2 / 53.8; log 13.9 / 46.0 (bar 21.2 / 88.4) | Panel d817a09a. The spread is right-skewed (skew 1.6 IG, 5.4 HY). The log target cuts MAE in both grades: gain over the bar 34% IG (interval from 30%) and 48% HY (from 39%), against 28% and 39% on the spread. Chosen on valid, so pending the team's decision. Not a candidate model |
+| 2026-11-19 | Miguel | 03_trees_ensembles | Pruned regression tree (depth 14, 50 per leaf) | all 33 | fit on train, scored on valid | 19.1 / 81.7 | gain vs bar IG 9.7%, HY 7.6%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 03_trees_ensembles | Bagging (random forest, max_features=None) | all 33 | fit on train, scored on valid | 15.7 / 63.6 | gain vs bar IG 26.1%, HY 28.0%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 03_trees_ensembles | Random forest | all 33 | fit on train, scored on valid | 15.4 / 62.1 | gain vs bar IG 27.2%, HY 29.7%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 03_trees_ensembles | XGBoost (500 trees, depth 10, learning rate 0.03) | all 33 | fit on train, scored on valid | 15.2 / 53.8 | gain vs bar IG 28.1%, HY 39.1%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 03_trees_ensembles | LightGBM | all 33 | fit on train, scored on valid | 17.2 / 64.3 | gain vs bar IG 19.0%, HY 27.2%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 04_knn_comparables | KNN model 1 (k = 5, distance weights) | all 33 | fit on train, scored on valid | 16.8 / 54.5 | gain vs bar IG 20.6%, HY 38.3%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 04_knn_comparables | KNN model 2 (grid search: k = 8, distance weights) | all 33 | fit on train, scored on valid | 16.8 / 54.8 | gain vs bar IG 20.9%, HY 38.0%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 04_knn_comparables | KNN model 3 (bagging of KNNs) | all 33 | fit on train, scored on valid | 17.0 / 56.3 | gain vs bar IG 19.8%, HY 36.3%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-19 | Miguel | 04_knn_comparables | KNN, trader's short list (7 inputs) | all 33 | fit on train, scored on valid | 22.2 / 63.5 | gain vs bar IG -4.6%, HY 28.1%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-20 | Miguel | 05_neural_network | Perceptron (one neuron) | all 33 | fit on train to Feb 2025, early stopping on Mar to May 2025, scored on valid | 18.8 / 70.2 | gain vs bar IG 11.0%, HY 20.5%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-20 | Miguel | 05_neural_network | MLP (64 and 32 ReLU, dropout 0.1, L2 1e-5) | all 33 | fit on train to Feb 2025, early stopping on Mar to May 2025, scored on valid | 13.7 / 56.8 | gain vs bar IG 35.2%, HY 35.8%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
+| 2026-11-20 | Miguel | 05_neural_network | Random forest on the same rows as the MLP | all 33 | fit on train to Feb 2025, early stopping on Mar to May 2025, scored on valid | 15.4 / 66.2 | gain vs bar IG 27.4%, HY 25.1%. Run on the final panel (sha256 d817a09a) to check the notebook end to end; the owner reruns it |
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Logistic regression | all 33 | fit on train, scored on valid | n/a (AUC 0.802, log loss 0.095, threshold 0.009: precision 0.03, recall 0.93) | widens_25bp, panel d817a09a |
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Random forest | all 33 | fit on train, scored on valid | n/a (AUC 0.800, log loss 0.092, threshold 0.076: precision 0.10, recall 0.59) | widens_25bp, panel d817a09a |
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | KNN (30,000-row sample) | all 33 | fit on train, scored on valid | n/a (AUC 0.777, log loss 0.150, threshold 0.030: precision 0.04, recall 0.73) | widens_25bp, panel d817a09a |
@@ -25,11 +37,12 @@ One line per model run, including failures and dropped variants. Validation scor
 
 ## Final result (P14)
 
-Test was opened once, after the decision below was pushed (commit 23a3887).
+Test was opened once, after the decision below was pushed (commit 23a3887). Run with xgboost 3.4.1 and scikit-learn 1.9.1: the lock
+fingerprint includes every model setting, so rerunning `99_final` with other versions can change it.
 
 | Date | Who | Notebook | Model and key parameters | Features | Validation | MAE bps (IG / HY) | Notes |
 |---|---|---|---|---|---|---|---|
-| 2026-11-23 | Miguel | 99_final (final, `OPEN_TEST = True`) | XGBoost on log(spread + 101), as chosen above | all 33 | fit on train + valid, scored on test (opened once, 01:25 UTC, lock 4b83ed1b) | 12.3 / 53.5 on **test** (matrix re-marked each date: 22.2 / 104.5) | Panel d817a09a. Gate on test: IG gain 44.8% (interval 41.4% to 47.8%), HY 48.8% (40.9% to 55.4%): **passes**. All grades 15.3 against 28.3. The final table |
+| 2026-11-23 | Miguel | 99_final (final, `OPEN_TEST = True`) | XGBoost on log(spread + 101), as chosen below | all 33 | fit on train + valid, scored on test (opened once, 01:25 UTC, lock 4b83ed1b) | 12.3 / 53.5 on **test** (matrix re-marked each date: 22.2 / 104.5) | Panel d817a09a. Gate on test: IG gain 44.8% (interval 41.4% to 47.8%), HY 48.8% (40.9% to 55.4%): **passes**. All grades 15.3 against 28.3. The final table |
 
 ## Decision before test (P13), 2026-11-23
 
