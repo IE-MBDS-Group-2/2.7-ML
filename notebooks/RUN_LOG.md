@@ -21,3 +21,26 @@ One line per model run, including failures and dropped variants. Validation scor
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Categorical NB, one per correlated group | 28 predictors | fit on train, scored on valid | n/a (AUC 0.716, log loss 0.288) | widens_25bp, panel d817a09a |
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Gaussian Naive Bayes | all 33 | fit on train, scored on valid | n/a (AUC 0.692, log loss 28.694) | widens_25bp, panel d817a09a |
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Reference (training rate) | training prevalence | fit on train, scored on valid | n/a (AUC 0.500, log loss 0.104) | widens_25bp, panel d817a09a |
+| 2026-11-23 | Miguel | 99_final (dry run, `OPEN_TEST = False`) | Final model: XGBoost on log(spread + 101), 500 trees, max depth 10, learning rate 0.03, subsample 0.8, colsample 0.7 (notebook 03 grid) | all 33 | fit on train, scored on valid | 13.9 / 46.0 (matrix re-marked each date: 21.2 / 88.4) | Panel d817a09a. Reproduces the 19 Nov target check. Gate on valid: IG gain 34.4% (interval 29.8% to 39.3%), HY 47.9% (38.9% to 55.4%): passes. Test not opened |
+
+## Decision before test (P13), 2026-11-23
+
+Final model: **XGBoost on log(spread + 101)**, settings as in the dry run above, fitted on train + valid and scored
+once on test in `99_final`.
+
+Chosen on valid, against the bar of 21.2 / 88.4 bp (IG / HY), from the comparison tables in `reports/`:
+
+| Model | IG | HY |
+|---|---|---|
+| XGBoost on log(spread + 101) | 13.9 | 46.0 |
+| MLP (05) | 13.7 | 56.8 |
+| XGBoost on the spread (03) | 15.2 | 53.8 |
+| KNN, k = 5, distance-weighted (04) | 16.8 | 54.5 |
+| Random forest (03) | 15.4 | 62.1 |
+
+Reasons: it ties the MLP in IG (0.2 bp apart) and is 11 bp (19%) better in HY, where the bar is weakest and the
+money is; it has the best HY interval of any model; it trains on all rows (the MLP holds out its early-stopping
+months); and notebook 03 explains it with permutation importance and SHAP.
+
+Not tried, and said so in the report: the MLP on the log target, and convolutional networks (our rows are 33
+unordered columns with no grid or sequence for a convolution to use).
