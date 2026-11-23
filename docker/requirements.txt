@@ -1,4 +1,4 @@
-# Loader image only. Pinned to the versions LDP runs in production.
+# Loader image only. Pinned to the versions the data lake runs.
 dagster==1.13.27
 dagster-webserver==1.13.27
 pandas==2.2.3

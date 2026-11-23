@@ -1,6 +1,6 @@
 # Data loader and group database (data admin)
 
-A self-contained Dagster project in Docker. It reads the source mart through a read-only connection, builds the
+A self-contained Dagster project in Docker. It reads Miguel's data lake through a read-only connection, builds the
 panel with `src/ml2/panel.py`, writes `data/processed/bond_month_panel.parquet` with a sha256 manifest, and
 publishes schema `ml2` to the group Postgres database.
 
@@ -9,6 +9,21 @@ snapshot_dates -> trace_bonds_month_end -> equity_month_end --+
                -> ust_par_month_end ----------------------------+-> bond_month_panel -> group_database
                -> macro_month_end ------------------------------+
 ```
+
+## Sources
+
+The loader reads Miguel's data lake (`LAKE_DB_URL`), a Postgres store of the sources below, and never writes to it.
+
+| Data lake table | What it holds | Where it comes from |
+|---|---|---|
+| `credit.trace_daily` | Each bond's trades, yield, price and volume per day | TRACE Enhanced (FINRA corporate bond trade reports), through IE's WRDS access |
+| `credit.bond_reference` | Issuer, ticker, coupon, maturity, 144A flag, grade, debt type | TRACE corporate bond master file, through IE's WRDS access |
+| `macro.series_daily` | US Treasury par yields; ICE BofA HY and BBB spread indices; VIX; SOFR | treasury.gov; FRED; the New York Fed |
+| `mart.prices_daily_v2`, `entities.shares_daily` | Daily stock prices and shares outstanding | Commercial equity market data |
+| `fundamentals.balance_sheet`, `fundamentals.company_profile`, `universes.sector_history` | Quarterly balance sheets, company profiles and sectors | Commercial company fundamentals |
+| `entities.companies`, `entities.security_identifiers`, `fixed_income.issuer_ticker_map` | Company names, issuer codes and the issuer-to-stock map | Built in the data lake from the sources above |
+
+TRACE is licensed through IE's WRDS subscription, so the panel stays inside the group and the submission.
 
 ## Run
 

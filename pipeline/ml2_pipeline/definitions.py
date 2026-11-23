@@ -11,7 +11,7 @@ defs = Definitions(
     assets=load_assets_from_modules([assets]),
     jobs=[refresh_all],
     resources={
-        "ldp": PostgresResource(url=EnvVar("LDP_DB_URL"), read_only=True),
+        "lake": PostgresResource(url=EnvVar("LAKE_DB_URL"), read_only=True),
         "groupdb": PostgresResource(url=EnvVar("GROUP_DB_URL")),
     },
 )

@@ -1,7 +1,7 @@
 """Treasury par curve interpolation.
 
 The spread target is the bond's yield minus the Treasury par yield at the bond's
-remaining maturity. The curve comes from LDP series UST_PAR_* (percent).
+remaining maturity. The curve comes from the data lake series UST_PAR_* (percent).
 Interpolation is linear in maturity, flat beyond the shortest and longest tenor.
 """
 

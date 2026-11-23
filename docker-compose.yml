@@ -29,7 +29,7 @@ services:
       dockerfile: docker/Dockerfile
     restart: unless-stopped
     environment:
-      LDP_DB_URL: ${LDP_DB_URL:?Set LDP_DB_URL in .env}
+      LAKE_DB_URL: ${LAKE_DB_URL:?Set LAKE_DB_URL in .env}
       GROUP_DB_URL: ${GROUP_DB_URL:?Set GROUP_DB_URL in .env}
     ports:
       - "127.0.0.1:3000:3000"

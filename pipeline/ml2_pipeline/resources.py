@@ -1,4 +1,4 @@
-"""Database resources: the LDP source (read-only) and the group database (target)."""
+"""Database resources: the data lake source (read-only) and the group database (target)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-# Dagster loader image: reads LDP, builds the panel, publishes to the group database.
+# Dagster loader image: reads Miguel's data lake, builds the panel, publishes to the group database.
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

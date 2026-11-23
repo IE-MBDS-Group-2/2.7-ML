@@ -1,4 +1,4 @@
-"""Dagster assets: extract from LDP, build the panel, publish to the group database.
+"""Dagster assets: extract from the data lake, build the panel, publish to the group database.
 
     snapshot_dates -> trace_bonds_month_end -> issuer_resolution -> equity_month_end --+
                    -> ust_par_month_end ----------------------------+-> bond_month_panel -> group_database
@@ -30,7 +30,7 @@ from ml2_pipeline import queries
 from ml2_pipeline.resources import PostgresResource
 
 SCHEMA = "ml2"
-MACRO_MAP = {  # LDP series id -> panel column, and a unit multiplier
+MACRO_MAP = {  # data lake series id -> panel column, and a unit multiplier
     "BAMLH0A0HYM2": ("hy_oas_bps", 100.0),
     "BAMLC0A4CBBB": ("bbb_oas_bps", 100.0),
     "VIXCLS": ("vix", 1.0),
@@ -55,10 +55,10 @@ def _series_asof(long: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 @asset(group_name="extract", compute_kind="sql")
-def snapshot_dates(context: AssetExecutionContext, ldp: PostgresResource) -> pd.DataFrame:
+def snapshot_dates(context: AssetExecutionContext, lake: PostgresResource) -> pd.DataFrame:
     """Month-end snapshot dates: the last TRACE trading day of each month."""
     ex = _cfg()["extract"]
-    df = ldp.read(
+    df = lake.read(
         queries.SNAPSHOT_DATES,
         {"start": ex["start_date"], "end": ex["end_date"], "min_bonds": ex["min_bonds_per_snapshot_day"],
          "min_share": ex["min_share_of_month_median_day"]},
@@ -69,12 +69,12 @@ def snapshot_dates(context: AssetExecutionContext, ldp: PostgresResource) -> pd.
 
 @asset(group_name="extract", compute_kind="sql")
 def trace_bonds_month_end(
-    context: AssetExecutionContext, ldp: PostgresResource, snapshot_dates: pd.DataFrame
+    context: AssetExecutionContext, lake: PostgresResource, snapshot_dates: pd.DataFrame
 ) -> pd.DataFrame:
     """Straight fixed-rate corporate bonds traded on each month-end, with month-level liquidity."""
     ex = _cfg()["extract"]
     snaps = [d.date().isoformat() for d in _dates(snapshot_dates)]
-    df = ldp.read(
+    df = lake.read(
         queries.TRACE_BONDS_MONTH_END,
         {"snapshots": snaps, "start": ex["start_date"], "end": ex["end_date"], "coupon_type": ex["coupon_type"]},
     )
@@ -86,11 +86,11 @@ def trace_bonds_month_end(
 
 @asset(group_name="extract", compute_kind="sql")
 def ust_par_month_end(
-    context: AssetExecutionContext, ldp: PostgresResource, snapshot_dates: pd.DataFrame
+    context: AssetExecutionContext, lake: PostgresResource, snapshot_dates: pd.DataFrame
 ) -> pd.DataFrame:
     """Treasury par curve (percent) as of each snapshot date. Index: snapshot_date."""
     dates = _dates(snapshot_dates)
-    long = ldp.read(
+    long = lake.read(
         queries.MACRO_SERIES,
         {"series": list(TENOR_YEARS), "start": (dates.min() - pd.Timedelta(days=15)).date(), "end": dates.max().date()},
     )
@@ -102,11 +102,11 @@ def ust_par_month_end(
 
 @asset(group_name="extract", compute_kind="sql")
 def macro_month_end(
-    context: AssetExecutionContext, ldp: PostgresResource, snapshot_dates: pd.DataFrame
+    context: AssetExecutionContext, lake: PostgresResource, snapshot_dates: pd.DataFrame
 ) -> pd.DataFrame:
     """Credit spreads, VIX and SOFR as of each snapshot date."""
     dates = _dates(snapshot_dates)
-    long = ldp.read(
+    long = lake.read(
         queries.MACRO_SERIES,
         {"series": list(MACRO_MAP), "start": (dates.min() - pd.Timedelta(days=15)).date(), "end": dates.max().date()},
     )
@@ -122,17 +122,17 @@ def macro_month_end(
 @asset(group_name="extract", compute_kind="sql")
 def issuer_resolution(
     context: AssetExecutionContext,
-    ldp: PostgresResource,
+    lake: PostgresResource,
     snapshot_dates: pd.DataFrame,
     trace_bonds_month_end: pd.DataFrame,
 ) -> pd.DataFrame:
     """Which listed company each bond-month's stock data comes from (ticker match, or the issuer-code map)."""
     dates = _dates(snapshot_dates)
     bonds = trace_bonds_month_end
-    tmap = ldp.read(queries.TICKER_MAP, {"c6": sorted(set(bonds["cusip_id"].str[:6]))})
+    tmap = lake.read(queries.TICKER_MAP, {"c6": sorted(set(bonds["cusip_id"].str[:6]))})
     tickers = sorted(set(bonds["issuer_ticker"].dropna()) | set(tmap["ticker"].dropna()))
     start = (dates.min() - pd.Timedelta(days=10)).date()
-    px = ldp.read(queries.PRICES, {"start": start, "end": dates.max().date(), "tickers": tickers})
+    px = lake.read(queries.PRICES, {"start": start, "end": dates.max().date(), "tickers": tickers})
     res = resolve_issuers(bonds, px, tmap)
     res["issuer_key"] = issuer_keys(res)
     moved = (res["source"] == "map") & (res["map_entity"] != res["ticker_entity"])
@@ -151,14 +151,14 @@ def issuer_resolution(
 @asset(group_name="extract", compute_kind="sql")
 def equity_month_end(
     context: AssetExecutionContext,
-    ldp: PostgresResource,
+    lake: PostgresResource,
     snapshot_dates: pd.DataFrame,
     trace_bonds_month_end: pd.DataFrame,
     issuer_resolution: pd.DataFrame,
 ) -> pd.DataFrame:
     """Issuer equity features, market cap, debt and sector per company key and snapshot date.
 
-    Everything is computed per listed company (LDP entity), so a ticker reused by another company never mixes
+    Everything is computed per listed company (data lake entity), so a ticker reused by another company never mixes
     two price histories; the result is keyed by issuer_key, the panel's issuer_ticker.
     """
     ex = _cfg()["extract"]
@@ -169,7 +169,7 @@ def equity_month_end(
     entities = [int(e) for e in sorted(res["entity_id"].unique())]
     tickers = sorted(set(res["equity_ticker"].dropna()) | set(res["issuer_ticker"].dropna()) | {market})
 
-    px = ldp.read(queries.PRICES, {"start": ex["equity_history_start"], "end": dates.max().date(), "tickers": tickers})
+    px = lake.read(queries.PRICES, {"start": ex["equity_history_start"], "end": dates.max().date(), "tickers": tickers})
     px["date"] = pd.to_datetime(px["date"])
     mkt = px[px["ticker"] == market].groupby("date")["adj_close"].last()
     px = px.dropna(subset=["entity_id"])
@@ -201,7 +201,7 @@ def equity_month_end(
     feats["entity_id"] = feats["entity"].astype("int64")
 
     # Shares outstanding by company, as of the snapshot, at most N days stale
-    shares = ldp.read(
+    shares = lake.read(
         queries.SHARES, {"entity_ids": entities, "start": pd.Timestamp(ex["equity_history_start"]).date()}
     )
     shares["date"] = pd.to_datetime(shares["date"])
@@ -213,7 +213,7 @@ def equity_month_end(
     feats.loc[jumps, "market_cap"] = np.nan
 
     # Total debt from the latest quarterly balance sheet already filed, reported in USD only
-    bs = ldp.read(queries.BALANCE_SHEET, {"tickers": tickers, "entity_ids": entities, "start": "2022-01-01"})
+    bs = lake.read(queries.BALANCE_SHEET, {"tickers": tickers, "entity_ids": entities, "start": "2022-01-01"})
     ticker_entity = res.groupby("equity_ticker")["entity_id"].agg(lambda s: s.value_counts().index[0])
     bs["entity_id"] = bs["entity_id"].fillna(bs["ticker"].map(ticker_entity))
     other_ccy = bs["currency"].notna() & (bs["currency"] != ex["debt_currency"])
@@ -238,14 +238,14 @@ def equity_month_end(
         via_map=("source", lambda s: bool((s == "map").any()))).reset_index()
     keys["snapshot_date"] = pd.to_datetime(keys["snapshot_date"])
     out = keys.merge(feats.drop(columns=["entity"]), on=["snapshot_date", "entity_id"], how="left")
-    sector = _sector_asof(ldp, sorted(set(keys["equity_ticker"].dropna())), dates)
+    sector = _sector_asof(lake, sorted(set(keys["equity_ticker"].dropna())), dates)
     out = out.merge(sector.rename(columns={"ticker": "equity_ticker"}), on=["snapshot_date", "equity_ticker"],
                     how="left")
 
     # Blank the stock data where its company is not confirmed as the bonds' issuer. Bond-months matched through
     # the issuer-code map are confirmed by construction; the rest need the issuer code or a distinctive name word.
-    codes = ldp.read(queries.ISSUER_CODES, {})
-    names = ldp.read(queries.COMPANY_NAMES, {"entity_ids": entities})
+    codes = lake.read(queries.ISSUER_CODES, {})
+    names = lake.read(queries.COMPANY_NAMES, {"entity_ids": entities})
     bonds_k = trace_bonds_month_end.assign(snapshot_date=pd.to_datetime(trace_bonds_month_end["snapshot_date"])).merge(
         issuer_resolution[["snapshot_date", "cusip_id", "issuer_key"]], on=["snapshot_date", "cusip_id"])
     bonds_k = bonds_k.assign(issuer_ticker=bonds_k["issuer_key"])
@@ -290,9 +290,9 @@ def _merge_asof_by(left: pd.DataFrame, right: pd.DataFrame, by: str, right_on: s
     ).drop(columns=[right_on])
 
 
-def _sector_asof(ldp: PostgresResource, tickers: list[str], dates: pd.DatetimeIndex) -> pd.DataFrame:
-    hist = ldp.read(queries.SECTOR_HISTORY, {"tickers": tickers})
-    prof = ldp.read(queries.SECTOR_PROFILE, {"tickers": tickers})
+def _sector_asof(lake: PostgresResource, tickers: list[str], dates: pd.DatetimeIndex) -> pd.DataFrame:
+    hist = lake.read(queries.SECTOR_HISTORY, {"tickers": tickers})
+    prof = lake.read(queries.SECTOR_PROFILE, {"tickers": tickers})
     grid = pd.MultiIndex.from_product([dates, tickers], names=["snapshot_date", "ticker"]).to_frame(index=False)
 
     hist["valid_from"] = pd.to_datetime(hist["valid_from"])

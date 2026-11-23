@@ -1,4 +1,4 @@
-"""SQL against the LDP mart. All read-only."""
+"""SQL against Miguel's data lake. All read-only."""
 
 # The last day of each month with a normal trading volume. Thin days are skipped: Good Friday (bond market
 # closed, a few trades still reported) and half-days such as the Friday after Thanksgiving.
@@ -72,7 +72,7 @@ where series_id = any(:series)
   and date between :start and :end
 """
 
-# Filter on ts_event (indexed), not on date: see the view comment in LDP.
+# Filter on ts_event (indexed), not on date: see the view comment in the data lake.
 PRICES = """
 select date, ticker, adj_close, raw_close, entity_id
 from mart.prices_daily_v2
@@ -97,7 +97,7 @@ where period = 'quarter'
   and date >= cast(:start as date)
 """
 
-# Issuer code (first 6 CUSIP characters) to listed company, with validity spans (LDP fixed_income views)
+# Issuer code (first 6 CUSIP characters) to listed company, with validity spans (data lake fixed_income views)
 TICKER_MAP = """
 select issuer_cusip6, entity_id, cusip6_valid_from, cusip6_valid_to, cusip6_ambiguous,
        ticker, valid_from, valid_to, ticker_precedence
