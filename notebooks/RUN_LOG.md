@@ -23,6 +23,14 @@ One line per model run, including failures and dropped variants. Validation scor
 | 2026-11-22 | Farah Alnuseirat | 06_annex_classification | Reference (training rate) | training prevalence | fit on train, scored on valid | n/a (AUC 0.500, log loss 0.104) | widens_25bp, panel d817a09a |
 | 2026-11-23 | Miguel | 99_final (dry run, `OPEN_TEST = False`) | Final model: XGBoost on log(spread + 101), 500 trees, max depth 10, learning rate 0.03, subsample 0.8, colsample 0.7 (notebook 03 grid) | all 33 | fit on train, scored on valid | 13.9 / 46.0 (matrix re-marked each date: 21.2 / 88.4) | Panel d817a09a. Reproduces the 19 Nov target check. Gate on valid: IG gain 34.4% (interval 29.8% to 39.3%), HY 47.9% (38.9% to 55.4%): passes. Test not opened |
 
+## Final result (P14)
+
+Test was opened once, after the decision below was pushed (commit 23a3887).
+
+| Date | Who | Notebook | Model and key parameters | Features | Validation | MAE bps (IG / HY) | Notes |
+|---|---|---|---|---|---|---|---|
+| 2026-11-23 | Miguel | 99_final (final, `OPEN_TEST = True`) | XGBoost on log(spread + 101), as chosen above | all 33 | fit on train + valid, scored on test (opened once, 01:25 UTC, lock 4b83ed1b) | 12.3 / 53.5 on **test** (matrix re-marked each date: 22.2 / 104.5) | Panel d817a09a. Gate on test: IG gain 44.8% (interval 41.4% to 47.8%), HY 48.8% (40.9% to 55.4%): **passes**. All grades 15.3 against 28.3. The final table |
+
 ## Decision before test (P13), 2026-11-23
 
 Final model: **XGBoost on log(spread + 101)**, settings as in the dry run above, fitted on train + valid and scored
