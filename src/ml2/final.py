@@ -19,10 +19,32 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
+from sklearn.compose import TransformedTargetRegressor
+
 from ml2.config import load_config, resolve
 from ml2.schema import feature_columns
 
 LOCK = "notebooks/test_opened.json"
+
+# The model learns log(spread + 101): spreads are right-skewed (skew 1.6 in IG, 5.4 in HY), and the shift keeps the
+# log defined for the few negative spreads (the lowest in train and valid is -97 bp). Predictions come back in bp.
+SPREAD_SHIFT = 101.0
+
+
+def log_spread(y):
+    """Spread in bp to log(spread + 101)."""
+    return np.log(np.asarray(y, dtype=float) + SPREAD_SHIFT)
+
+
+def exp_spread(z):
+    """Inverse of log_spread: back to bp."""
+    return np.exp(np.asarray(z, dtype=float)) - SPREAD_SHIFT
+
+
+def on_log_spread(regressor) -> TransformedTargetRegressor:
+    """Wrap a regressor so it is fitted on log(spread + 101) and predicts spreads in bp."""
+    return TransformedTargetRegressor(regressor=regressor, func=log_spread, inverse_func=exp_spread)
 
 
 def _plain(value):
@@ -36,6 +58,8 @@ def _plain(value):
         return [_plain(v) for v in value]
     if hasattr(value, "get_params"):
         return type(value).__name__
+    if callable(value) and hasattr(value, "__qualname__"):
+        return f"{value.__module__}.{value.__qualname__}"  # not repr(): it holds a memory address
     return repr(value)
 
 
