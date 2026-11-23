@@ -70,3 +70,36 @@ def test_load_panel_refuses_test_without_the_flag():
 
     with pytest.raises(PermissionError):
         load_panel(partitions=["valid", "test"])
+
+
+def test_log_spread_round_trips_and_handles_negative_spreads():
+    import numpy as np
+
+    from ml2.final import exp_spread, log_spread
+
+    y = np.array([-97.3, 0.0, 85.7, 2993.0])
+    assert np.all(np.isfinite(log_spread(y)))
+    assert np.allclose(exp_spread(log_spread(y)), y)
+
+
+def test_on_log_spread_predicts_in_basis_points():
+    import numpy as np
+    from sklearn.linear_model import LinearRegression
+
+    from ml2.final import on_log_spread
+
+    X = pd.DataFrame({"x": np.arange(50, dtype=float)})
+    y = pd.Series(np.exp(0.05 * X["x"]) * 20 - 101)
+    pred = on_log_spread(LinearRegression()).fit(X, y).predict(X)
+    assert np.allclose(pred, y, rtol=1e-6)
+
+
+def test_model_spec_is_the_same_across_sessions_for_function_settings():
+    # Functions must be named by module and name, not by memory address, or a rerun would look like a new model.
+    from sklearn.linear_model import LinearRegression
+
+    from ml2.final import _plain, log_spread, on_log_spread
+
+    assert _plain(log_spread) == "ml2.final.log_spread"
+    params = _plain(on_log_spread(LinearRegression()).get_params(deep=True))
+    assert "0x" not in json.dumps(params)
