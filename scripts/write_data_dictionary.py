@@ -58,11 +58,6 @@ by the bond's latest master record, which can postdate the trade.
 
 Some columns contain the target or future information and must never be model inputs (list at the end).
 `ml2.schema.feature_columns()` returns the allowed inputs.
-
-## Columns
-
-Some columns contain the target or future information and must never be model inputs (list at the end).
-`ml2.schema.feature_columns()` returns the allowed inputs.
 """
 
 GROUP_TITLES = {
